@@ -7,6 +7,7 @@ export const permissions = {
   accessAdminControlBullBoard: 'accessAdminControlBullBoard',
   accessAssistant: 'accessAssistant',
   accessHoldingsChart: 'accessHoldingsChart',
+  accessTaxBrReport: 'accessTaxBrReport',
   createAccess: 'createAccess',
   createAccount: 'createAccount',
   createAccountBalance: 'createAccountBalance',
@@ -72,6 +73,7 @@ export function getPermissions(aRole: Role): string[] {
         permissions.accessAdminControl,
         permissions.accessAssistant,
         permissions.accessHoldingsChart,
+        permissions.accessTaxBrReport,
         permissions.createAccess,
         permissions.createAccount,
         permissions.createAccountBalance,
@@ -123,6 +125,7 @@ export function getPermissions(aRole: Role): string[] {
       return [
         permissions.accessAssistant,
         permissions.accessHoldingsChart,
+        permissions.accessTaxBrReport,
         permissions.createAccess,
         permissions.createAccount,
         permissions.createAccountBalance,
