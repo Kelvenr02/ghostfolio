@@ -53,6 +53,8 @@ import {
   PortfolioReportResponse,
   PublicPortfolioResponse,
   SymbolItem,
+  TaxBrReportParameters,
+  TaxBrReportResponse,
   User,
   UserItem,
   WatchlistResponse
@@ -727,6 +729,18 @@ export class DataService {
 
   public fetchPortfolioReport() {
     return this.http.get<PortfolioReportResponse>('/api/v1/portfolio/report');
+  }
+
+  public fetchTaxBrReport({ month, year }: TaxBrReportParameters) {
+    let params = new HttpParams().set('year', year.toString());
+
+    if (month != null) {
+      params = params.set('month', month.toString());
+    }
+
+    return this.http.get<TaxBrReportResponse>('/api/v1/tax-br/report', {
+      params
+    });
   }
 
   public fetchPrompt({

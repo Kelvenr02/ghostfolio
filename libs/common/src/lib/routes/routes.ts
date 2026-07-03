@@ -142,6 +142,11 @@ export const internalRoutes = {
         routerLink: ['/portfolio', 'fire'],
         title: 'FIRE'
       },
+      taxBr: {
+        path: 'tax-br',
+        routerLink: ['/portfolio', 'tax-br'],
+        title: $localize`Calculadora de IR`
+      },
       xRay: {
         path: 'x-ray',
         routerLink: ['/portfolio', 'x-ray'],

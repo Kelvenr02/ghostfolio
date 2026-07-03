@@ -13,6 +13,7 @@ import {
   analyticsOutline,
   calculatorOutline,
   pieChartOutline,
+  receiptOutline,
   scanOutline,
   swapVerticalOutline
 } from 'ionicons/icons';
@@ -64,6 +65,11 @@ export class PortfolioPageComponent {
               iconName: 'scan-outline',
               label: internalRoutes.portfolio.subRoutes.xRay.title,
               routerLink: internalRoutes.portfolio.subRoutes.xRay.routerLink
+            },
+            {
+              iconName: 'receipt-outline',
+              label: internalRoutes.portfolio.subRoutes.taxBr.title,
+              routerLink: internalRoutes.portfolio.subRoutes.taxBr.routerLink
             }
           ];
           this.user = state.user;
@@ -76,6 +82,7 @@ export class PortfolioPageComponent {
       analyticsOutline,
       calculatorOutline,
       pieChartOutline,
+      receiptOutline,
       scanOutline,
       swapVerticalOutline
     });
