@@ -58,7 +58,9 @@ export interface IFixedIncomeLot {
   assetProfileIdentifier: string;
   id: string; // id of the originating BUY activity
   principalBrl: Big; // includes the purchase fee
+  quantity: Big; // original quantity bought, used to pro-rate principal per unit
   remainingPrincipalBrl: Big;
+  remainingQuantity: Big;
   symbol: string;
 }
 
