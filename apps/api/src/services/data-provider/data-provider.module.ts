@@ -2,6 +2,9 @@ import { RedisCacheModule } from '@ghostfolio/api/app/redis-cache/redis-cache.mo
 import { ConfigurationModule } from '@ghostfolio/api/services/configuration/configuration.module';
 import { CryptocurrencyModule } from '@ghostfolio/api/services/cryptocurrency/cryptocurrency.module';
 import { AlphaVantageService } from '@ghostfolio/api/services/data-provider/alpha-vantage/alpha-vantage.service';
+import { BcbService } from '@ghostfolio/api/services/data-provider/bcb/bcb.service';
+import { SgsClientService } from '@ghostfolio/api/services/data-provider/bcb/sgs-client.service';
+import { SgsIndexBuilderService } from '@ghostfolio/api/services/data-provider/bcb/sgs-index-builder.service';
 import { CoinGeckoService } from '@ghostfolio/api/services/data-provider/coingecko/coingecko.service';
 import { EodHistoricalDataService } from '@ghostfolio/api/services/data-provider/eod-historical-data/eod-historical-data.service';
 import { FinancialModelingPrepService } from '@ghostfolio/api/services/data-provider/financial-modeling-prep/financial-modeling-prep.service';
@@ -36,6 +39,9 @@ import { DataProviderService } from './data-provider.service';
   ],
   providers: [
     AlphaVantageService,
+    BcbService,
+    SgsClientService,
+    SgsIndexBuilderService,
     CoinGeckoService,
     DataProviderService,
     EodHistoricalDataService,
@@ -48,6 +54,7 @@ import { DataProviderService } from './data-provider.service';
     {
       inject: [
         AlphaVantageService,
+        BcbService,
         CoinGeckoService,
         EodHistoricalDataService,
         FinancialModelingPrepService,
@@ -60,6 +67,7 @@ import { DataProviderService } from './data-provider.service';
       provide: 'DataProviderInterfaces',
       useFactory: (
         alphaVantageService,
+        bcbService,
         coinGeckoService,
         eodHistoricalDataService,
         financialModelingPrepService,
@@ -70,6 +78,7 @@ import { DataProviderService } from './data-provider.service';
         yahooFinanceService
       ) => [
         alphaVantageService,
+        bcbService,
         coinGeckoService,
         eodHistoricalDataService,
         financialModelingPrepService,
