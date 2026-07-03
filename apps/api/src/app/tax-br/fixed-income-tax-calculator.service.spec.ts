@@ -353,6 +353,9 @@ describe('FixedIncomeTaxCalculatorService', () => {
     // exists anywhere on this service's return type -- the aggregator (a
     // separate file) is the only place a DARF total is ever computed.
     expect(result.redemptionSlices[0].taxWithheldBrl.toString()).toBe('22.5');
-    expect(Object.keys(result)).toEqual(['redemptionSlices', 'openLots']);
+    expect(Object.keys(result).sort()).toEqual([
+      'openLots',
+      'redemptionSlices'
+    ]);
   });
 });
