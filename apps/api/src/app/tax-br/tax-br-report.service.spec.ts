@@ -127,4 +127,88 @@ describe('TaxBrReportService', () => {
 
     expect(holding.quantity).toBe(15);
   });
+
+  it('builds a fully populated month summary across equity, FII income and fixed income redemptions', async () => {
+    activitiesServiceMock.getActivities.mockResolvedValue({
+      activities: [
+        // ETF: buy in January, sell in July for a taxable gain
+        buildRawActivity({
+          id: 'etf-buy',
+          date: new Date('2026-01-05T12:00:00.000Z'),
+          quantity: 10,
+          tags: [{ name: 'ETF' }],
+          valueInBaseCurrency: 1000,
+          SymbolProfile: { dataSource: DataSource.YAHOO, symbol: 'BOVA11.SA' }
+        }),
+        buildRawActivity({
+          id: 'etf-sell',
+          date: new Date('2026-07-10T12:00:00.000Z'),
+          quantity: 10,
+          tags: [{ name: 'ETF' }],
+          type: ActivityType.SELL,
+          valueInBaseCurrency: 1500,
+          SymbolProfile: { dataSource: DataSource.YAHOO, symbol: 'BOVA11.SA' }
+        }),
+        // FII: monthly exempt income in July
+        buildRawActivity({
+          id: 'fii-dividend',
+          date: new Date('2026-07-15T12:00:00.000Z'),
+          quantity: 1,
+          tags: [{ name: 'FII' }],
+          type: ActivityType.DIVIDEND,
+          valueInBaseCurrency: 200,
+          SymbolProfile: { dataSource: DataSource.YAHOO, symbol: 'HGLG11.SA' }
+        }),
+        // Fixed income: buy in January, redeem in July
+        buildRawActivity({
+          id: 'rf-buy',
+          date: new Date('2026-01-05T12:00:00.000Z'),
+          quantity: 10,
+          tags: [{ name: 'RendaFixa' }],
+          valueInBaseCurrency: 1000,
+          SymbolProfile: {
+            dataSource: DataSource.MANUAL,
+            symbol: 'TESOURO-SELIC-2029'
+          }
+        }),
+        buildRawActivity({
+          id: 'rf-sell',
+          date: new Date('2026-07-10T12:00:00.000Z'),
+          quantity: 10,
+          tags: [{ name: 'RendaFixa' }],
+          type: ActivityType.SELL,
+          valueInBaseCurrency: 1100,
+          SymbolProfile: {
+            dataSource: DataSource.MANUAL,
+            symbol: 'TESOURO-SELIC-2029'
+          }
+        })
+      ],
+      count: 5
+    });
+
+    const report = await service.getReport({
+      userId: 'user-1',
+      year: 2026,
+      month: 7
+    });
+
+    const july = report.months.find((month) => month.yearMonth === '2026-07');
+
+    expect(july.equity).toEqual([
+      expect.objectContaining({
+        fiscalClass: 'ETF',
+        isExempt: false,
+        ratePercent: 15,
+        taxDueBrl: 75,
+        totalRealizedGainBrl: 500
+      })
+    ]);
+    expect(july.fiiIncome.totalExemptIncomeBrl).toBe(200);
+    expect(july.fixedIncome.redemptions).toHaveLength(1);
+    expect(july.fixedIncome.totalYieldBrl).toBe(100);
+    expect(july.darf.totalTaxDueBrl).toBe(75);
+    expect(july.darf.isPayable).toBe(true);
+    expect(report.classificationWarnings).toEqual([]);
+  });
 });
