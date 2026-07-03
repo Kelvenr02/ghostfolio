@@ -32,6 +32,17 @@ export const EQUITY_TAX_RATE_PERCENT: Record<
 
 export const DARF_CODE = '6015';
 
+// Lei 8.668/1993: rendimento mensal de FII e isento para PF somente se (i) as
+// cotas negociam exclusivamente em bolsa/balcao, (ii) o fundo tem >=50
+// cotistas, e (iii) nenhum cotista detem >=10% das cotas. O Ghostfolio nao
+// tem como verificar essas 3 condicoes, entao elas sao sempre assumidas
+// verdadeiras e declaradas ao usuario.
+export const FII_INCOME_EXEMPTION_ASSUMPTION =
+  'Rendimento de FII assumido isento (Lei 8.668/1993): pressupoe negociacao ' +
+  'exclusiva em bolsa/balcao, fundo com 50 ou mais cotistas e nenhum ' +
+  'cotista com 10% ou mais das cotas -- condicoes nao verificaveis pelos ' +
+  'dados do Ghostfolio.';
+
 export const FIXED_INCOME_RATE_BRACKETS: {
   bracket: FixedIncomeRateBracket;
   maxDays: number | null;
