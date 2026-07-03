@@ -325,6 +325,7 @@ enum DataGatheringFrequency {
 
 enum DataSource {
   ALPHA_VANTAGE
+  BCB
   COINGECKO
   EOD_HISTORICAL_DATA
   FINANCIAL_MODELING_PREP
