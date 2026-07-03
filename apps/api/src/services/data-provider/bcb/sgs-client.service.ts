@@ -18,6 +18,9 @@ export class SgsClientService {
     seriesId: number;
     to: Date;
   }): Promise<ISgsObservation[]> {
+    void this.configurationService;
+    void this.fetchService;
+
     throw new Error('NOT_IMPLEMENTED');
   }
 }
