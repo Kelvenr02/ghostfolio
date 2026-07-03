@@ -56,6 +56,7 @@ export type FixedIncomeRateBracket =
 export interface IFixedIncomeLot {
   acquisitionDateBrt: string;
   assetProfileIdentifier: string;
+  dataSource: DataSource;
   id: string; // id of the originating BUY activity
   principalBrl: Big; // includes the purchase fee
   quantity: Big; // original quantity bought, used to pro-rate principal per unit

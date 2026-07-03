@@ -51,6 +51,7 @@ export class FixedIncomeTaxCalculatorService {
           principalBrl,
           id: activity.id,
           acquisitionDateBrt: activity.dateBrt,
+          dataSource: activity.dataSource,
           quantity: activity.quantity,
           remainingPrincipalBrl: principalBrl,
           remainingQuantity: activity.quantity,
