@@ -30,7 +30,13 @@ export class BcbService implements DataProviderInterface {
     private readonly sgsIndexBuilderService: SgsIndexBuilderService
   ) {}
 
-  public canHandle(): boolean {
+  public canHandle(symbol: string): boolean {
+    void symbol;
+    void this.configurationService;
+    void this.prismaService;
+    void this.sgsClientService;
+    void this.sgsIndexBuilderService;
+
     throw new Error('NOT_IMPLEMENTED');
   }
 
