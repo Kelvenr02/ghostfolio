@@ -16,9 +16,13 @@ import {
   Validators
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { NgxSkeletonLoaderModule } from 'ngx-skeleton-loader';
+
+import { GfEditAllocationTargetsDialogComponent } from './edit-allocation-targets-dialog/edit-allocation-targets-dialog.component';
+import { EditAllocationTargetsDialogParams } from './edit-allocation-targets-dialog/interfaces/interfaces';
 
 @Component({
   imports: [
@@ -45,6 +49,7 @@ export class GfContributionPlanPageComponent {
     private changeDetectorRef: ChangeDetectorRef,
     private dataService: DataService,
     private destroyRef: DestroyRef,
+    private dialog: MatDialog,
     private formBuilder: FormBuilder,
     private userService: UserService
   ) {
@@ -89,9 +94,26 @@ export class GfContributionPlanPageComponent {
       });
   }
 
-  // TODO(B7): abrir o dialog de edição de alvos (create-or-update-account-dialog como referência de estilo)
   public openEditAllocationTargetsDialog() {
-    // TODO(B7): implementar abertura do MatDialog de edição de alvos
+    const dialogRef = this.dialog.open<
+      GfEditAllocationTargetsDialogComponent,
+      EditAllocationTargetsDialogParams
+    >(GfEditAllocationTargetsDialogComponent, {
+      data: {
+        targets: this.targets?.targets ?? []
+      },
+      height: '80vh',
+      width: '50rem'
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result: AllocationTargetsResponse | undefined) => {
+        if (result) {
+          this.initializeAllocationTargets();
+        }
+      });
   }
 
   private initializeAllocationTargets() {
