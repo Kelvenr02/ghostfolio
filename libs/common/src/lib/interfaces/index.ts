@@ -80,6 +80,19 @@ import type { PortfolioPerformanceResponse } from './responses/portfolio-perform
 import type { PortfolioReportResponse } from './responses/portfolio-report.interface';
 import type { PublicPortfolioResponse } from './responses/public-portfolio-response.interface';
 import type { QuotesResponse } from './responses/quotes-response.interface';
+import type {
+  TaxBrClassificationWarning,
+  TaxBrDarfEstimate,
+  TaxBrEquityClassMonthSummary,
+  TaxBrEquityHoldingSummary,
+  TaxBrFiiIncomeMonthSummary,
+  TaxBrFixedIncomeLotSummary,
+  TaxBrFixedIncomeMonthSummary,
+  TaxBrFixedIncomeRedemptionDetail,
+  TaxBrMonthSummary,
+  TaxBrReportResponse,
+  TaxBrSaleDetail
+} from './responses/tax-br-report-response.interface';
 import type { WatchlistResponse } from './responses/watchlist-response.interface';
 import type { RuleSettings } from './rule-settings.interface';
 import type { ScraperConfiguration } from './scraper-configuration.interface';
@@ -94,6 +107,7 @@ import type { SubscriptionOffer } from './subscription-offer.interface';
 import type { SymbolItem } from './symbol-item.interface';
 import type { SymbolMetrics } from './symbol-metrics.interface';
 import type { SystemMessage } from './system-message.interface';
+import type { TaxBrReportParameters } from './tax-br-report-parameters.interface';
 import type { ToggleOption } from './toggle-option.interface';
 import type { UserItem } from './user-item.interface';
 import type { UserSettings } from './user-settings.interface';
@@ -191,6 +205,18 @@ export {
   SymbolItem,
   SymbolMetrics,
   SystemMessage,
+  TaxBrClassificationWarning,
+  TaxBrDarfEstimate,
+  TaxBrEquityClassMonthSummary,
+  TaxBrEquityHoldingSummary,
+  TaxBrFiiIncomeMonthSummary,
+  TaxBrFixedIncomeLotSummary,
+  TaxBrFixedIncomeMonthSummary,
+  TaxBrFixedIncomeRedemptionDetail,
+  TaxBrMonthSummary,
+  TaxBrReportParameters,
+  TaxBrReportResponse,
+  TaxBrSaleDetail,
   ToggleOption,
   User,
   UserItem,

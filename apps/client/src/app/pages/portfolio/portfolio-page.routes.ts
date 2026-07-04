@@ -30,6 +30,11 @@ export const routes: Routes = [
           import('./fire/fire-page.routes').then((m) => m.routes)
       },
       {
+        path: internalRoutes.portfolio.subRoutes.taxBr.path,
+        loadChildren: () =>
+          import('./tax-br/tax-br-page.routes').then((m) => m.routes)
+      },
+      {
         path: internalRoutes.portfolio.subRoutes.xRay.path,
         loadChildren: () =>
           import('./x-ray/x-ray-page.routes').then((m) => m.routes)

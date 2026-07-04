@@ -1,0 +1,204 @@
+<div class="container">
+  <h1 class="d-none d-sm-block h3 mb-3 text-center" i18n>
+    Calculadora de IR (Brasil)
+  </h1>
+
+  @if (user?.settings?.isExperimentalFeatures) {
+    @if (isLoading) {
+      <div class="d-flex justify-content-center py-3">
+        <ngx-skeleton-loader
+          animation="pulse"
+          [theme]="{ height: '2rem', width: '100%' }"
+        />
+      </div>
+    } @else if (report) {
+      @if (report.classificationWarnings?.length > 0) {
+        <div class="alert alert-warning" role="alert">
+          <strong i18n>Símbolos sem classificação fiscal:</strong>
+          <ul class="mb-0">
+            @for (
+              warning of report.classificationWarnings;
+              track warning.symbol
+            ) {
+              <li>
+                {{ warning.symbol }} —
+                @if (warning.reason === 'CONFLICTING_TAGS') {
+                  <ng-container i18n
+                    >tags conflitantes ({{
+                      warning.conflictingTagNames?.join(', ')
+                    }})</ng-container
+                  >
+                } @else {
+                  <ng-container i18n
+                    >nenhuma tag reconhecida (Ação / ETF / BDR / FII /
+                    RendaFixa)</ng-container
+                  >
+                }
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
+      <h2 class="h5" i18n>Posições de renda variável (agora)</h2>
+      @if (report.equityHoldings?.length > 0) {
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th i18n>Ativo</th>
+              <th i18n>Classe fiscal</th>
+              <th class="text-right" i18n>Quantidade</th>
+              <th class="text-right" i18n>Preço médio (BRL)</th>
+              <th class="text-right" i18n>Custo total (BRL)</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (holding of report.equityHoldings; track holding.symbol) {
+              <tr>
+                <td>{{ holding.symbol }}</td>
+                <td>
+                  <span
+                    class="badge"
+                    [class.badge-secondary]="holding.fiscalClass !== 'ACAO'"
+                    [class.badge-success]="holding.fiscalClass === 'ACAO'"
+                    >{{ holding.fiscalClass }}</span
+                  >
+                  @if (holding.fiscalClass !== 'ACAO') {
+                    <span class="text-muted ml-1" i18n
+                      >(sem isenção de R$20k)</span
+                    >
+                  }
+                </td>
+                <td class="text-right">{{ holding.quantity }}</td>
+                <td class="text-right">
+                  {{ holding.averagePriceBrl | currency: 'BRL' }}
+                </td>
+                <td class="text-right">
+                  {{ holding.costBasisBrl | currency: 'BRL' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="text-muted" i18n>Nenhuma posição de renda variável.</p>
+      }
+
+      <h2 class="h5" i18n>Lotes abertos de renda fixa (agora)</h2>
+      @if (report.openFixedIncomeLots?.length > 0) {
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th i18n>Ativo</th>
+              <th i18n>Data de aquisição</th>
+              <th class="text-right" i18n>Dias corridos</th>
+              <th class="text-right" i18n>Alíquota se resgatado hoje</th>
+              <th class="text-right" i18n>Principal remanescente (BRL)</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (
+              lot of report.openFixedIncomeLots;
+              track lot.symbol + lot.acquisitionDate
+            ) {
+              <tr>
+                <td>{{ lot.symbol }}</td>
+                <td>{{ lot.acquisitionDate }}</td>
+                <td class="text-right">{{ lot.daysHeldAsOfToday }}</td>
+                <td class="text-right">
+                  {{ lot.rateBracketIfRedeemedToday }}%
+                </td>
+                <td class="text-right">
+                  {{ lot.remainingPrincipalBrl | currency: 'BRL' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="text-muted" i18n>Nenhum lote de renda fixa em aberto.</p>
+      }
+
+      <h2 class="h5" i18n>Resumo mensal</h2>
+      @for (month of report.months; track month.yearMonth) {
+        <div class="mb-4">
+          <h3 class="h6">{{ month.yearMonth }}</h3>
+
+          @if (month.equity?.length > 0) {
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th i18n>Classe</th>
+                  <th class="text-right" i18n>Total vendido (BRL)</th>
+                  <th class="text-right" i18n>Ganho/prejuízo (BRL)</th>
+                  <th i18n>Isento?</th>
+                  <th class="text-right" i18n>Alíquota</th>
+                  <th class="text-right" i18n>IR devido (BRL)</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (entry of month.equity; track entry.fiscalClass) {
+                  <tr>
+                    <td>{{ entry.fiscalClass }}</td>
+                    <td class="text-right">
+                      {{ entry.totalGrossSalesBrl | currency: 'BRL' }}
+                    </td>
+                    <td class="text-right">
+                      {{ entry.totalRealizedGainBrl | currency: 'BRL' }}
+                    </td>
+                    <td>
+                      @if (entry.isExempt) {
+                        <span class="badge badge-success" i18n>Sim</span>
+                      } @else {
+                        <span class="badge badge-secondary" i18n>Não</span>
+                      }
+                    </td>
+                    <td class="text-right">{{ entry.ratePercent }}%</td>
+                    <td class="text-right">
+                      {{ entry.taxDueBrl | currency: 'BRL' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+
+          @if (month.fiiIncome) {
+            <p class="mb-1">
+              <strong i18n>Rendimento isento de FII:</strong>
+              {{ month.fiiIncome.totalExemptIncomeBrl | currency: 'BRL' }}
+            </p>
+          }
+
+          @if (month.darf) {
+            <p class="mb-1">
+              <strong i18n>DARF (código {{ month.darf.code }}):</strong>
+              {{ month.darf.totalTaxDueBrl | currency: 'BRL' }}
+              <ng-container i18n>· vencimento</ng-container>
+              {{ month.darf.dueDate }}
+              @if (!month.darf.isPayable) {
+                <span class="text-muted" i18n>(nada a pagar)</span>
+              }
+            </p>
+          }
+        </div>
+      }
+
+      @if (report.assumptions?.length > 0) {
+        <div class="alert alert-info">
+          <strong i18n>Premissas do cálculo:</strong>
+          <ul class="mb-0">
+            @for (assumption of report.assumptions; track assumption) {
+              <li>{{ assumption }}</li>
+            }
+          </ul>
+        </div>
+      }
+    }
+  } @else {
+    <p class="text-muted" i18n>
+      Ative "Experimental Features" nas configurações da conta para acessar a
+      calculadora de IR.
+    </p>
+  }
+</div>
