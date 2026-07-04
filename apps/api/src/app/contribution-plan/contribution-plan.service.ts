@@ -10,6 +10,7 @@ import {
   ContributionPlanOrder,
   ContributionPlanResponse,
   ContributionPlanWarning,
+  DataProviderResponse,
   PortfolioPosition
 } from '@ghostfolio/common/interfaces';
 import { AllocationTargetsResponse } from '@ghostfolio/common/interfaces/responses/allocation-targets-response.interface';
@@ -107,6 +108,44 @@ export class ContributionPlanService {
     const missingPriceSymbols: string[] = [];
     const resolvedAssets: ResolvedAsset[] = [];
 
+    // FIX 3 (batch de cotações, N+1): coleta todos os (dataSource, symbol) de
+    // alvos DISCRETE sem holding correspondente e resolve com UMA única
+    // chamada a getQuotes, em vez de uma chamada por símbolo dentro do loop.
+    // A cascata por símbolo (quote ausente -> marketDataService.getLatest com
+    // aviso STALE_PRICE -> acumula em missingPriceSymbols -> 422) permanece
+    // idêntica; apenas a origem da quote muda de "buscar agora" para
+    // "consultar o mapa já resolvido".
+    const quoteItemsByIdentifier = new Map<
+      string,
+      { dataSource: DataSource; symbol: string }
+    >();
+
+    for (const target of targets) {
+      const identifier = getAssetProfileIdentifier({
+        dataSource: target.symbolProfile.dataSource,
+        symbol: target.symbolProfile.symbol
+      });
+      const holding = holdingsByIdentifier.get(identifier);
+
+      if (
+        target.purchaseMode === PurchaseMode.DISCRETE &&
+        !holding &&
+        !quoteItemsByIdentifier.has(identifier)
+      ) {
+        quoteItemsByIdentifier.set(identifier, {
+          dataSource: target.symbolProfile.dataSource,
+          symbol: target.symbolProfile.symbol
+        });
+      }
+    }
+
+    const quotesByIdentifier: { [identifier: string]: DataProviderResponse } =
+      quoteItemsByIdentifier.size > 0
+        ? await this.dataProviderService.getQuotes({
+            items: Array.from(quoteItemsByIdentifier.values())
+          })
+        : {};
+
     for (const target of targets) {
       const identifier = getAssetProfileIdentifier({
         dataSource: target.symbolProfile.dataSource,
@@ -128,6 +167,7 @@ export class ContributionPlanService {
           currency: target.symbolProfile.currency,
           dataSource: target.symbolProfile.dataSource,
           holding,
+          quote: quotesByIdentifier[identifier],
           symbol: target.symbolProfile.symbol
         });
 
@@ -411,11 +451,13 @@ export class ContributionPlanService {
     currency,
     dataSource,
     holding,
+    quote,
     symbol
   }: {
     currency: string;
     dataSource: DataSource;
     holding: PortfolioPosition | undefined;
+    quote: DataProviderResponse | undefined;
     symbol: string;
   }): Promise<PriceResolution | null> {
     if (holding) {
@@ -428,12 +470,6 @@ export class ContributionPlanService {
         )
       };
     }
-
-    const identifier = getAssetProfileIdentifier({ dataSource, symbol });
-    const quotes = await this.dataProviderService.getQuotes({
-      items: [{ dataSource, symbol }]
-    });
-    const quote = quotes[identifier];
 
     if (quote) {
       return {
@@ -465,16 +501,27 @@ export class ContributionPlanService {
     return null;
   }
 
+  // FIX 1 (fronteira controlada Big.js <-> number): esta é a ÚNICA fronteira
+  // do módulo em que a aritmética sai de Big.js. O ExchangeRateDataService
+  // .toCurrency do upstream é number-only (não aceita nem devolve Big), então
+  // não há como preservar precisão arbitrária atravessando essa chamada. Por
+  // isso o resultado é imediatamente re-quantizado a centavos via
+  // roundToCents logo abaixo, ANTES de qualquer decisão do engine (que só
+  // enxerga valores já em centavos). Esta é uma exceção controlada e
+  // documentada à regra do CLAUDE.md de manter toda a aritmética financeira
+  // em Big.js - o desvio dura exatamente uma chamada de função.
   private convertToBaseCurrency(value: Big, currency: string): Big {
     if (currency === BASE_CURRENCY) {
-      return value;
+      return roundToCents(value);
     }
 
-    return new Big(
-      this.exchangeRateDataService.toCurrency(
-        value.toNumber(),
-        currency,
-        BASE_CURRENCY
+    return roundToCents(
+      new Big(
+        this.exchangeRateDataService.toCurrency(
+          value.toNumber(),
+          currency,
+          BASE_CURRENCY
+        )
       )
     );
   }

@@ -47,9 +47,54 @@ function clampNonNegative(value: Big): Big {
   return value.lt(0) ? new Big(0) : value;
 }
 
+// FIX 2 (precondição explícita no engine): o service já garante essas
+// invariantes antes de chamar o engine, mas o engine em si (funções puras,
+// sem acesso ao DB/HTTP) não pode assumir silenciosamente um input
+// bem-formado - um non-null assertion implícito (asset.unitPrice.lte(...))
+// em código morto de defesa é pior do que falhar alto e cedo. Nenhum
+// cenário de teste hoje viola essas regras, então esta validação não muda
+// nenhum resultado verde existente; ela só documenta e reforça, em tempo de
+// execução, o que os tipos de ContributionPlanEngineAsset já prometem.
+function assertValidPreconditions(input: ContributionPlanEngineInput): void {
+  input.assets.forEach((asset, index) => {
+    if (asset.purchaseMode === PurchaseMode.DISCRETE) {
+      if (asset.unitPrice === undefined || asset.unitPrice === null) {
+        throw new Error(
+          `buildContributionPlan: asset at index ${index} (${asset.symbol}) is DISCRETE but has no unitPrice defined`
+        );
+      }
+
+      if (!asset.unitPrice.gt(0)) {
+        throw new Error(
+          `buildContributionPlan: asset at index ${index} (${asset.symbol}) is DISCRETE but its unitPrice is not > 0`
+        );
+      }
+    }
+
+    if (asset.purchaseMode === PurchaseMode.CONTINUOUS) {
+      if (
+        asset.minPurchaseValue === undefined ||
+        asset.minPurchaseValue === null
+      ) {
+        throw new Error(
+          `buildContributionPlan: asset at index ${index} (${asset.symbol}) is CONTINUOUS but has no minPurchaseValue defined`
+        );
+      }
+
+      if (asset.minPurchaseValue.lt(0)) {
+        throw new Error(
+          `buildContributionPlan: asset at index ${index} (${asset.symbol}) is CONTINUOUS but its minPurchaseValue is not >= 0`
+        );
+      }
+    }
+  });
+}
+
 export function buildContributionPlan(
   input: ContributionPlanEngineInput
 ): ContributionPlanEngineResult {
+  assertValidPreconditions(input);
+
   const contributionAmount = roundToCents(input.contributionAmount);
 
   const workingAssets: WorkingAsset[] = input.assets.map((asset) => ({

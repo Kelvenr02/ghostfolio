@@ -575,6 +575,76 @@ const SCENARIOS: Scenario[] = [
   }
 ];
 
+// ---------------------------------------------------------------------------
+// FIX 2 - explicit domain preconditions at the top of buildContributionPlan
+// ---------------------------------------------------------------------------
+
+describe('domain preconditions (FIX 2)', () => {
+  it('throws when a DISCRETE asset has no unitPrice defined', () => {
+    const input: ContributionPlanEngineInput = {
+      contributionAmount: n(100),
+      assets: [
+        {
+          currentValue: n(0),
+          purchaseMode: PurchaseMode.DISCRETE,
+          symbol: 'NO_UNIT_PRICE',
+          targetPercentage: n(100)
+        }
+      ]
+    };
+
+    expect(() => buildContributionPlan(input)).toThrow(
+      /NO_UNIT_PRICE.*DISCRETE.*unitPrice/
+    );
+  });
+
+  it('throws when a DISCRETE asset has unitPrice equal to 0', () => {
+    const input = {
+      contributionAmount: n(100),
+      assets: [discreteAsset('ZERO_UNIT_PRICE', 100, 0, 0)]
+    };
+
+    expect(() => buildContributionPlan(input)).toThrow(
+      /ZERO_UNIT_PRICE.*DISCRETE.*unitPrice/
+    );
+  });
+
+  it('throws when a CONTINUOUS asset has no minPurchaseValue defined', () => {
+    const input: ContributionPlanEngineInput = {
+      contributionAmount: n(100),
+      assets: [
+        {
+          currentValue: n(0),
+          purchaseMode: PurchaseMode.CONTINUOUS,
+          symbol: 'NO_MIN_PURCHASE',
+          targetPercentage: n(100)
+        }
+      ]
+    };
+
+    expect(() => buildContributionPlan(input)).toThrow(
+      /NO_MIN_PURCHASE.*CONTINUOUS.*minPurchaseValue/
+    );
+  });
+
+  it('throws when a CONTINUOUS asset has a negative minPurchaseValue', () => {
+    const input = {
+      contributionAmount: n(100),
+      assets: [continuousAsset('NEGATIVE_MIN_PURCHASE', 100, 0, -1)]
+    };
+
+    expect(() => buildContributionPlan(input)).toThrow(
+      /NEGATIVE_MIN_PURCHASE.*CONTINUOUS.*minPurchaseValue/
+    );
+  });
+
+  it('does not throw for a well-formed input (DISCRETE with unitPrice > 0, CONTINUOUS with minPurchaseValue >= 0)', () => {
+    const input = buildFixtureInput(300);
+
+    expect(() => buildContributionPlan(input)).not.toThrow();
+  });
+});
+
 describe.each(CONTRIBUTION_AMOUNTS)(
   'parametric grid - contributionAmount = %s',
   (contributionAmount) => {
