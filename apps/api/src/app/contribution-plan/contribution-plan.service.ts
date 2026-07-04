@@ -2,7 +2,10 @@ import { DataProviderService } from '@ghostfolio/api/services/data-provider/data
 import { ExchangeRateDataService } from '@ghostfolio/api/services/exchange-rate-data/exchange-rate-data.service';
 import { MarketDataService } from '@ghostfolio/api/services/market-data/market-data.service';
 import { PrismaService } from '@ghostfolio/api/services/prisma/prisma.service';
-import { UpdateAllocationTargetsDto } from '@ghostfolio/common/dtos';
+import {
+  AllocationTargetItemDto,
+  UpdateAllocationTargetsDto
+} from '@ghostfolio/common/dtos';
 import { getAssetProfileIdentifier } from '@ghostfolio/common/helper';
 import {
   AllocationTarget,
@@ -70,6 +73,43 @@ export class ContributionPlanService {
     impersonationId: string;
     userId: string;
   }): Promise<ContributionPlanResponse> {
+    const contributionAmount = roundToCents(new Big(amount));
+
+    const { resolvedAssets, warnings } = await this.resolvePlanAssets({
+      impersonationId,
+      userId
+    });
+
+    const engineInput = this.buildEngineInput(
+      resolvedAssets,
+      contributionAmount
+    );
+
+    const result = buildContributionPlan(engineInput);
+
+    return this.serializePlanResponse({
+      contributionAmount,
+      result,
+      resolvedAssets,
+      warnings
+    });
+  }
+
+  // FIX 2 (refactor mecânico, sem mudança de comportamento): etapa 1 de
+  // createPlan - carrega os alvos e os holdings, resolve preço unitário de
+  // cada DISCRETE (com o batch de cotações do FIX 3, inalterado) e monta os
+  // ResolvedAsset + warnings correspondentes. Lança os mesmos HttpException
+  // de antes (TARGETS_NOT_CONFIGURED, PRICE_UNAVAILABLE) nos mesmos pontos.
+  private async resolvePlanAssets({
+    impersonationId,
+    userId
+  }: {
+    impersonationId: string;
+    userId: string;
+  }): Promise<{
+    resolvedAssets: ResolvedAsset[];
+    warnings: ContributionPlanWarning[];
+  }> {
     const targets = await this.prismaService.allocationTarget.findMany({
       where: { userId },
       include: { symbolProfile: true }
@@ -225,9 +265,17 @@ export class ContributionPlanService {
       }
     }
 
-    const contributionAmount = roundToCents(new Big(amount));
+    return { resolvedAssets, warnings };
+  }
 
-    const engineInput: ContributionPlanEngineInput = {
+  // FIX 2 (refactor mecânico, sem mudança de comportamento): etapa 2 de
+  // createPlan - mapeamento puro de ResolvedAsset[] para o input do engine
+  // (aritmética sempre em Big.js, re-quantizada a centavos).
+  private buildEngineInput(
+    resolvedAssets: ResolvedAsset[],
+    contributionAmount: Big
+  ): ContributionPlanEngineInput {
+    return {
       assets: resolvedAssets.map((asset) => ({
         currentValue: roundToCents(asset.currentValue),
         minPurchaseValue: asset.minPurchaseValue
@@ -240,9 +288,23 @@ export class ContributionPlanService {
       })),
       contributionAmount
     };
+  }
 
-    const result = buildContributionPlan(engineInput);
-
+  // FIX 2 (refactor mecânico, sem mudança de comportamento): etapa 3 de
+  // createPlan - traduz o resultado puro do engine (Big.js) para o
+  // ContributionPlanResponse da API (numbers), incluindo o warning de
+  // resíduo não alocado e os cálculos de percentual antes/depois.
+  private serializePlanResponse({
+    contributionAmount,
+    result,
+    resolvedAssets,
+    warnings
+  }: {
+    contributionAmount: Big;
+    result: ReturnType<typeof buildContributionPlan>;
+    resolvedAssets: ResolvedAsset[];
+    warnings: ContributionPlanWarning[];
+  }): ContributionPlanResponse {
     if (result.residualAmount.gt(0)) {
       warnings.push({
         code: 'RESIDUAL_NOT_ALLOCATED',
@@ -342,6 +404,74 @@ export class ContributionPlanService {
     userId: string,
     { targets }: UpdateAllocationTargetsDto
   ): Promise<AllocationTargetsResponse> {
+    this.validateTargetsOrThrow(targets);
+
+    const currencyByIdentifier =
+      await this.resolveCurrenciesForNewProfiles(targets);
+
+    return this.prismaService.$transaction(async (prisma) => {
+      const symbolProfileIdByTarget = new Map<
+        (typeof targets)[number],
+        string
+      >();
+
+      for (const target of targets) {
+        const identifier = getAssetProfileIdentifier({
+          dataSource: target.dataSource,
+          symbol: target.symbol
+        });
+
+        const symbolProfile = await prisma.symbolProfile.upsert({
+          create: {
+            currency: currencyByIdentifier.get(identifier)!,
+            dataSource: target.dataSource,
+            symbol: target.symbol
+          },
+          update: {},
+          where: {
+            dataSource_symbol: {
+              dataSource: target.dataSource,
+              symbol: target.symbol
+            }
+          }
+        });
+
+        symbolProfileIdByTarget.set(target, symbolProfile.id);
+      }
+
+      await prisma.allocationTarget.deleteMany({ where: { userId } });
+
+      await prisma.allocationTarget.createMany({
+        data: targets.map((target) => ({
+          minPurchaseValue:
+            target.minPurchaseValue != null
+              ? target.minPurchaseValue
+              : target.purchaseMode === PurchaseMode.CONTINUOUS
+                ? 0
+                : null,
+          purchaseMode: target.purchaseMode,
+          symbolProfileId: symbolProfileIdByTarget.get(target),
+          targetPercentage: target.targetPercentage,
+          userId
+        }))
+      });
+
+      const createdTargets = await prisma.allocationTarget.findMany({
+        include: { symbolProfile: true },
+        where: { userId }
+      });
+
+      return {
+        targets: createdTargets.map((target) => this.toAllocationTarget(target))
+      };
+    });
+  }
+
+  // FIX 2 (refactor mecânico, sem mudança de comportamento): etapa 1 de
+  // replaceTargets - valida que a soma dos percentuais-alvo é exatamente
+  // 100% e que não há símbolo duplicado, lançando os mesmos HttpException
+  // de antes (TARGET_PERCENTAGE_SUM_INVALID, DUPLICATE_TARGET).
+  private validateTargetsOrThrow(targets: AllocationTargetItemDto[]): void {
     const sumOfTargetPercentages = targets.reduce(
       (total, target) => total.plus(new Big(String(target.targetPercentage))),
       new Big(0)
@@ -378,16 +508,21 @@ export class ContributionPlanService {
 
       seenIdentifiers.add(identifier);
     }
+  }
 
-    // FIX 1 (CRITICAL, moeda autoritativa do servidor): o cliente não é mais
-    // fonte de verdade para `currency` (o DTO não carrega mais esse campo -
-    // ver update-allocation-targets.dto.ts). Para símbolos que já têm
-    // SymbolProfile local, a moeda persistida é preservada (update: {} não a
-    // toca). Para símbolos novos, a moeda real é resolvida via UMA chamada
-    // batch a dataProviderService.getQuotes ANTES da transação; se algum
-    // símbolo novo não puder ter a moeda resolvida, falha alto (422
-    // CURRENCY_UNRESOLVED) em vez de persistir um SymbolProfile com moeda
-    // adivinhada.
+  // FIX 1 (CRITICAL, moeda autoritativa do servidor) + FIX 2 (refactor
+  // mecânico, sem mudança de comportamento): etapa 2 de replaceTargets - o
+  // cliente não é mais fonte de verdade para `currency` (o DTO não carrega
+  // mais esse campo - ver update-allocation-targets.dto.ts). Para símbolos
+  // que já têm SymbolProfile local, a moeda persistida é preservada (o
+  // upsert em replaceTargets usa update: {} e não a toca). Para símbolos
+  // novos, a moeda real é resolvida aqui via UMA chamada batch a
+  // dataProviderService.getQuotes ANTES da transação; se algum símbolo novo
+  // não puder ter a moeda resolvida, falha alto (422 CURRENCY_UNRESOLVED)
+  // em vez de persistir um SymbolProfile com moeda adivinhada.
+  private async resolveCurrenciesForNewProfiles(
+    targets: AllocationTargetItemDto[]
+  ): Promise<Map<string, string>> {
     const existingSymbolProfiles =
       await this.prismaService.symbolProfile.findMany({
         select: { currency: true, dataSource: true, symbol: true },
@@ -458,62 +593,7 @@ export class ContributionPlanService {
       }
     }
 
-    return this.prismaService.$transaction(async (prisma) => {
-      const symbolProfileIdByTarget = new Map<
-        (typeof targets)[number],
-        string
-      >();
-
-      for (const target of targets) {
-        const identifier = getAssetProfileIdentifier({
-          dataSource: target.dataSource,
-          symbol: target.symbol
-        });
-
-        const symbolProfile = await prisma.symbolProfile.upsert({
-          create: {
-            currency: currencyByIdentifier.get(identifier)!,
-            dataSource: target.dataSource,
-            symbol: target.symbol
-          },
-          update: {},
-          where: {
-            dataSource_symbol: {
-              dataSource: target.dataSource,
-              symbol: target.symbol
-            }
-          }
-        });
-
-        symbolProfileIdByTarget.set(target, symbolProfile.id);
-      }
-
-      await prisma.allocationTarget.deleteMany({ where: { userId } });
-
-      await prisma.allocationTarget.createMany({
-        data: targets.map((target) => ({
-          minPurchaseValue:
-            target.minPurchaseValue != null
-              ? target.minPurchaseValue
-              : target.purchaseMode === PurchaseMode.CONTINUOUS
-                ? 0
-                : null,
-          purchaseMode: target.purchaseMode,
-          symbolProfileId: symbolProfileIdByTarget.get(target),
-          targetPercentage: target.targetPercentage,
-          userId
-        }))
-      });
-
-      const createdTargets = await prisma.allocationTarget.findMany({
-        include: { symbolProfile: true },
-        where: { userId }
-      });
-
-      return {
-        targets: createdTargets.map((target) => this.toAllocationTarget(target))
-      };
-    });
+    return currencyByIdentifier;
   }
 
   private toAllocationTarget(

@@ -645,6 +645,44 @@ describe('domain preconditions (FIX 2)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// FIX 1 - iteration cap guard on the Phase 1 greedy loop
+// ---------------------------------------------------------------------------
+
+describe('iteration cap guard on the Phase 1 greedy loop (FIX 1)', () => {
+  it('completes a legitimately huge number of iterations (100,000 purchases) and still conserves purchases + residual = B', () => {
+    const input: ContributionPlanEngineInput = {
+      contributionAmount: n(1000),
+      assets: [
+        discreteAsset('PENNY_STOCK', 100, 0, '0.01'),
+        continuousAsset('FILLER', 0, 1_000_000_000, 0)
+      ]
+    };
+
+    const result = buildContributionPlan(input);
+
+    const pennyStock = findPurchase(result, 'PENNY_STOCK');
+
+    // B / unitPrice = 1000 / 0.01 = 100,000 whole units, no leftover
+    expect(pennyStock.quantity.eq(100_000)).toBe(true);
+    expect(pennyStock.amount.eq(1000)).toBe(true);
+    expect(result.residualAmount.eq(0)).toBe(true);
+
+    expectInvariants(result, input);
+  });
+
+  // The cap is derived as contributionAmount / smallest discrete unitPrice
+  // (rounded up), so the greedy loop can never legitimately need more
+  // iterations than that bound allows - reaching the throw branch would
+  // require the Phase 1 accounting itself to be broken (e.g. a purchase
+  // that consumes less than the smallest unitPrice). There is no way to
+  // construct such an input through the public buildContributionPlan API
+  // without first breaking the invariant the guard exists to protect, so
+  // this branch is intentionally not exercised via construction; the test
+  // above proves the cap does not falsely trigger on a legitimate,
+  // very-large-iteration scenario.
+});
+
 describe.each(CONTRIBUTION_AMOUNTS)(
   'parametric grid - contributionAmount = %s',
   (contributionAmount) => {

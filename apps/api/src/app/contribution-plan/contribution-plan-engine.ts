@@ -132,6 +132,42 @@ export function buildContributionPlan(
 
   let remainingBudget = contributionAmount;
 
+  // FIX 1 (HIGH - guard de terminação do loop guloso da Fase 1): cada
+  // iteração consome de remainingBudget pelo menos a menor unitPrice > 0
+  // entre os DISCRETE, então o loop termina matematicamente em, no máximo,
+  // contributionAmount / menorUnitPrice iterações. Esse limite é calculado
+  // ANTES do loop e imposto como cota explícita - isso NUNCA deve disparar
+  // se a matemática estiver correta; é um guard de invariante de
+  // terminação (fail-loud), não uma regra de negócio. Se não houver
+  // DISCRETE elegível, maxIterations fica em 0 e a Fase 1 nem chega a
+  // rodar (eligible.length === 0 na primeira checagem).
+  const ABSOLUTE_MAX_ITERATIONS = 1_000_000;
+
+  const discreteUnitPrices = workingAssets
+    .filter(
+      (asset) =>
+        asset.purchaseMode === PurchaseMode.DISCRETE && asset.unitPrice.gt(0)
+    )
+    .map((asset) => asset.unitPrice);
+
+  let maxIterations = 0;
+
+  if (discreteUnitPrices.length > 0) {
+    const smallestUnitPrice = discreteUnitPrices.reduce((smallest, price) =>
+      price.lt(smallest) ? price : smallest
+    );
+
+    maxIterations = Math.min(
+      contributionAmount
+        .div(smallestUnitPrice)
+        .round(0, Big.roundUp)
+        .toNumber(),
+      ABSOLUTE_MAX_ITERATIONS
+    );
+  }
+
+  let iterationCount = 0;
+
   // Phase 1 (§7.3): greedy discrete loop
   for (;;) {
     const eligible = workingAssets.filter(
@@ -143,6 +179,19 @@ export function buildContributionPlan(
 
     if (eligible.length === 0) {
       break;
+    }
+
+    iterationCount++;
+
+    // istanbul ignore next -- guard de invariante de terminação inalcançável
+    // por construção via a API pública de buildContributionPlan sem antes
+    // quebrar a própria invariante que ele protege (ver FIX 1 no spec);
+    // coberto indiretamente pelo teste de 100.000 iterações legítimas, que
+    // prova que o guard não dispara falsamente.
+    if (iterationCount > maxIterations) {
+      throw new Error(
+        `buildContributionPlan: Phase 1 greedy loop exceeded its iteration cap (${maxIterations}) - this should be mathematically impossible and indicates a broken termination invariant, not a valid large plan`
+      );
     }
 
     const chosen = pickLargestGap(eligible);

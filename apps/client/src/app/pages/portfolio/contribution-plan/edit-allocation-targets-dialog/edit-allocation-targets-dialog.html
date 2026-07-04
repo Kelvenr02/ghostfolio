@@ -71,7 +71,9 @@
 
           <button
             class="mt-2"
+            i18n-title
             mat-icon-button
+            title="Remover alvo"
             type="button"
             [disabled]="targetsRows.length <= 1"
             (click)="removeTarget($index)"
