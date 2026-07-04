@@ -58,6 +58,13 @@ export class PortfolioPageComponent {
             },
             {
               iconName: 'calculator-outline',
+              label: internalRoutes.portfolio.subRoutes.contributionPlan.title,
+              routerLink:
+                internalRoutes.portfolio.subRoutes.contributionPlan.routerLink,
+              showCondition: !!state.user?.settings?.isExperimentalFeatures
+            },
+            {
+              iconName: 'calculator-outline',
               label: internalRoutes.portfolio.subRoutes.fire.title,
               routerLink: internalRoutes.portfolio.subRoutes.fire.routerLink
             },
