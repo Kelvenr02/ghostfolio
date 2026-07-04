@@ -2,23 +2,30 @@ import { DataProviderService } from '@ghostfolio/api/services/data-provider/data
 import { ExchangeRateDataService } from '@ghostfolio/api/services/exchange-rate-data/exchange-rate-data.service';
 import { MarketDataService } from '@ghostfolio/api/services/market-data/market-data.service';
 import { PrismaService } from '@ghostfolio/api/services/prisma/prisma.service';
+import { UpdateAllocationTargetsDto } from '@ghostfolio/common/dtos';
 import { getAssetProfileIdentifier } from '@ghostfolio/common/helper';
 import {
+  AllocationTarget,
   ContributionPlanAllocation,
   ContributionPlanOrder,
   ContributionPlanResponse,
   ContributionPlanWarning,
   PortfolioPosition
 } from '@ghostfolio/common/interfaces';
+import { AllocationTargetsResponse } from '@ghostfolio/common/interfaces/responses/allocation-targets-response.interface';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { DataSource, PurchaseMode } from '@prisma/client';
+import { DataSource, Prisma, PurchaseMode } from '@prisma/client';
 import { Big } from 'big.js';
 
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { buildContributionPlan } from './contribution-plan-engine';
 import { roundToCents } from './contribution-plan.helper';
 import { ContributionPlanEngineInput } from './interfaces/interfaces';
+
+type AllocationTargetWithSymbolProfile = Prisma.AllocationTargetGetPayload<{
+  include: { symbolProfile: true };
+}>;
 
 // This fork is a single-user, Brazil-only instance (see CLAUDE.md) - the
 // same hardcoded base currency the tax-br module already relies on.
@@ -277,6 +284,126 @@ export class ContributionPlanService {
       residualAmount: roundToCents(result.residualAmount).toNumber(),
       totalValueAfter: roundToCents(totalValueAfter).toNumber(),
       totalValueBefore: roundToCents(totalValueBefore).toNumber()
+    };
+  }
+
+  public async getTargets(userId: string): Promise<AllocationTargetsResponse> {
+    const targets = await this.prismaService.allocationTarget.findMany({
+      include: { symbolProfile: true },
+      where: { userId }
+    });
+
+    return {
+      targets: targets.map((target) => this.toAllocationTarget(target))
+    };
+  }
+
+  public async replaceTargets(
+    userId: string,
+    { targets }: UpdateAllocationTargetsDto
+  ): Promise<AllocationTargetsResponse> {
+    const sumOfTargetPercentages = targets.reduce(
+      (total, target) => total.plus(new Big(String(target.targetPercentage))),
+      new Big(0)
+    );
+
+    if (!sumOfTargetPercentages.eq(new Big(100))) {
+      throw new HttpException(
+        {
+          code: 'TARGET_PERCENTAGE_SUM_INVALID',
+          message: `A soma dos percentuais-alvo deve ser exatamente 100% (atual: ${sumOfTargetPercentages.toFixed(2)}%).`
+        },
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
+
+    const seenIdentifiers = new Set<string>();
+
+    for (const target of targets) {
+      const identifier = getAssetProfileIdentifier({
+        dataSource: target.dataSource,
+        symbol: target.symbol
+      });
+
+      if (seenIdentifiers.has(identifier)) {
+        throw new HttpException(
+          {
+            code: 'DUPLICATE_TARGET',
+            message: `O ativo ${target.symbol} (${target.dataSource}) está duplicado nos alvos.`,
+            symbol: target.symbol
+          },
+          HttpStatus.UNPROCESSABLE_ENTITY
+        );
+      }
+
+      seenIdentifiers.add(identifier);
+    }
+
+    return this.prismaService.$transaction(async (prisma) => {
+      const symbolProfileIdByTarget = new Map<
+        (typeof targets)[number],
+        string
+      >();
+
+      for (const target of targets) {
+        const symbolProfile = await prisma.symbolProfile.upsert({
+          create: {
+            currency: target.currency,
+            dataSource: target.dataSource,
+            symbol: target.symbol
+          },
+          update: {},
+          where: {
+            dataSource_symbol: {
+              dataSource: target.dataSource,
+              symbol: target.symbol
+            }
+          }
+        });
+
+        symbolProfileIdByTarget.set(target, symbolProfile.id);
+      }
+
+      await prisma.allocationTarget.deleteMany({ where: { userId } });
+
+      await prisma.allocationTarget.createMany({
+        data: targets.map((target) => ({
+          minPurchaseValue:
+            target.minPurchaseValue != null
+              ? target.minPurchaseValue
+              : target.purchaseMode === PurchaseMode.CONTINUOUS
+                ? 0
+                : null,
+          purchaseMode: target.purchaseMode,
+          symbolProfileId: symbolProfileIdByTarget.get(target),
+          targetPercentage: target.targetPercentage,
+          userId
+        }))
+      });
+
+      const createdTargets = await prisma.allocationTarget.findMany({
+        include: { symbolProfile: true },
+        where: { userId }
+      });
+
+      return {
+        targets: createdTargets.map((target) => this.toAllocationTarget(target))
+      };
+    });
+  }
+
+  private toAllocationTarget(
+    target: AllocationTargetWithSymbolProfile
+  ): AllocationTarget {
+    return {
+      dataSource: target.symbolProfile.dataSource,
+      id: target.id,
+      minPurchaseValue: target.minPurchaseValue ?? undefined,
+      name: target.symbolProfile.name ?? undefined,
+      purchaseMode: target.purchaseMode,
+      symbol: target.symbolProfile.symbol,
+      symbolProfileId: target.symbolProfileId,
+      targetPercentage: target.targetPercentage
     };
   }
 

@@ -36,6 +36,7 @@ import { AssetModule } from './asset/asset.module';
 import { AuthDeviceModule } from './auth-device/auth-device.module';
 import { AuthModule } from './auth/auth.module';
 import { CacheModule } from './cache/cache.module';
+import { ContributionPlanModule } from './contribution-plan/contribution-plan.module';
 import { AiModule } from './endpoints/ai/ai.module';
 import { ApiKeysModule } from './endpoints/api-keys/api-keys.module';
 import { AssetProfilesModule } from './endpoints/asset-profiles/asset-profiles.module';
@@ -107,6 +108,7 @@ import { UserModule } from './user/user.module';
     CacheModule,
     ConfigModule.forRoot(),
     ConfigurationModule,
+    ContributionPlanModule,
     CronModule,
     DataGatheringQueueModule,
     DataProviderModule,

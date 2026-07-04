@@ -5,6 +5,18 @@ import { Big } from 'big.js';
 
 import { ContributionPlanService } from './contribution-plan.service';
 
+function buildAllocationTargetItemDto(overrides: Record<string, unknown> = {}) {
+  return {
+    currency: 'BRL',
+    dataSource: DataSource.YAHOO,
+    minPurchaseValue: undefined,
+    purchaseMode: PurchaseMode.DISCRETE,
+    symbol: 'BOVA11.SA',
+    targetPercentage: 100,
+    ...overrides
+  };
+}
+
 function buildTarget(overrides: Record<string, unknown> = {}) {
   return {
     id: 'target-1',
@@ -45,7 +57,18 @@ describe('ContributionPlanService', () => {
   let exchangeRateDataServiceMock: { toCurrency: jest.Mock };
   let marketDataServiceMock: { getLatest: jest.Mock };
   let portfolioServiceMock: { getDetails: jest.Mock };
-  let prismaServiceMock: { allocationTarget: { findMany: jest.Mock } };
+  let transactionClientMock: {
+    allocationTarget: {
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+      findMany: jest.Mock;
+    };
+    symbolProfile: { upsert: jest.Mock };
+  };
+  let prismaServiceMock: {
+    $transaction: jest.Mock;
+    allocationTarget: { findMany: jest.Mock };
+  };
   let service: ContributionPlanService;
 
   beforeEach(() => {
@@ -67,7 +90,23 @@ describe('ContributionPlanService', () => {
     portfolioServiceMock = {
       getDetails: jest.fn().mockResolvedValue({ holdings: {} })
     };
+    transactionClientMock = {
+      allocationTarget: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findMany: jest.fn().mockResolvedValue([])
+      },
+      symbolProfile: {
+        upsert: jest.fn().mockImplementation(({ create }) =>
+          Promise.resolve({
+            id: `profile-${create.symbol}`,
+            ...create
+          })
+        )
+      }
+    };
     prismaServiceMock = {
+      $transaction: jest.fn((callback) => callback(transactionClientMock)),
       allocationTarget: {
         findMany: jest.fn().mockResolvedValue([])
       }
@@ -376,5 +415,203 @@ describe('ContributionPlanService', () => {
     );
 
     expect(sumOrders.plus(response.residualAmount).toNumber()).toBe(300);
+  });
+
+  describe('getTargets', () => {
+    it('maps allocationTarget rows (with their included symbolProfile) to AllocationTarget', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({
+          id: 'target-1',
+          minPurchaseValue: null,
+          purchaseMode: PurchaseMode.DISCRETE,
+          symbolProfileId: 'profile-1',
+          targetPercentage: 60
+        })
+      ]);
+
+      const response = await service.getTargets('user-1');
+
+      expect(prismaServiceMock.allocationTarget.findMany).toHaveBeenCalledWith({
+        include: { symbolProfile: true },
+        where: { userId: 'user-1' }
+      });
+      expect(response).toEqual({
+        targets: [
+          {
+            dataSource: DataSource.YAHOO,
+            id: 'target-1',
+            minPurchaseValue: undefined,
+            name: 'BOVA11',
+            purchaseMode: PurchaseMode.DISCRETE,
+            symbol: 'BOVA11.SA',
+            symbolProfileId: 'profile-1',
+            targetPercentage: 60
+          }
+        ]
+      });
+    });
+
+    it('returns an empty targets array when the user has no allocation targets', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([]);
+
+      const response = await service.getTargets('user-1');
+
+      expect(response).toEqual({ targets: [] });
+    });
+  });
+
+  describe('replaceTargets', () => {
+    it('rejects with 422 when the sum of targetPercentage is not exactly 100', async () => {
+      await expect(
+        service.replaceTargets('user-1', {
+          targets: [
+            buildAllocationTargetItemDto({ targetPercentage: 60 }),
+            buildAllocationTargetItemDto({
+              symbol: 'IVVB11.SA',
+              targetPercentage: 39.5
+            })
+          ]
+        } as never)
+      ).rejects.toMatchObject({
+        status: 422,
+        response: expect.objectContaining({
+          code: 'TARGET_PERCENTAGE_SUM_INVALID'
+        })
+      });
+
+      expect(prismaServiceMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 422 when (dataSource, symbol) is duplicated across items', async () => {
+      await expect(
+        service.replaceTargets('user-1', {
+          targets: [
+            buildAllocationTargetItemDto({ targetPercentage: 60 }),
+            buildAllocationTargetItemDto({ targetPercentage: 40 })
+          ]
+        } as never)
+      ).rejects.toMatchObject({
+        status: 422,
+        response: expect.objectContaining({ code: 'DUPLICATE_TARGET' })
+      });
+
+      expect(prismaServiceMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('replaces the target set atomically inside a single $transaction: upserts SymbolProfile by dataSource_symbol, deletes the old targets, then recreates them', async () => {
+      transactionClientMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({
+          id: 'target-1',
+          symbolProfileId: 'profile-BOVA11.SA',
+          targetPercentage: 100,
+          symbolProfile: {
+            id: 'profile-BOVA11.SA',
+            currency: 'BRL',
+            dataSource: DataSource.YAHOO,
+            name: undefined,
+            symbol: 'BOVA11.SA'
+          }
+        })
+      ]);
+
+      const response = await service.replaceTargets('user-1', {
+        targets: [buildAllocationTargetItemDto({ targetPercentage: 100 })]
+      } as never);
+
+      expect(prismaServiceMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(transactionClientMock.symbolProfile.upsert).toHaveBeenCalledWith({
+        create: {
+          currency: 'BRL',
+          dataSource: DataSource.YAHOO,
+          symbol: 'BOVA11.SA'
+        },
+        update: {},
+        where: {
+          dataSource_symbol: {
+            dataSource: DataSource.YAHOO,
+            symbol: 'BOVA11.SA'
+          }
+        }
+      });
+      expect(
+        transactionClientMock.allocationTarget.deleteMany
+      ).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
+      expect(
+        transactionClientMock.allocationTarget.createMany
+      ).toHaveBeenCalledWith({
+        data: [
+          {
+            minPurchaseValue: null,
+            purchaseMode: PurchaseMode.DISCRETE,
+            symbolProfileId: 'profile-BOVA11.SA',
+            targetPercentage: 100,
+            userId: 'user-1'
+          }
+        ]
+      });
+      expect(response.targets).toHaveLength(1);
+    });
+
+    it('upserts a SymbolProfile for a symbol never traded locally (no pre-existing row)', async () => {
+      transactionClientMock.symbolProfile.upsert.mockResolvedValue({
+        id: 'profile-new',
+        currency: 'BRL',
+        dataSource: DataSource.MANUAL,
+        symbol: 'TESOURO-SELIC-2029'
+      });
+      transactionClientMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({
+          id: 'target-new',
+          symbolProfileId: 'profile-new',
+          targetPercentage: 100,
+          symbolProfile: {
+            id: 'profile-new',
+            currency: 'BRL',
+            dataSource: DataSource.MANUAL,
+            name: undefined,
+            symbol: 'TESOURO-SELIC-2029'
+          }
+        })
+      ]);
+
+      await service.replaceTargets('user-1', {
+        targets: [
+          buildAllocationTargetItemDto({
+            dataSource: DataSource.MANUAL,
+            purchaseMode: PurchaseMode.CONTINUOUS,
+            symbol: 'TESOURO-SELIC-2029',
+            targetPercentage: 100
+          })
+        ]
+      } as never);
+
+      expect(transactionClientMock.symbolProfile.upsert).toHaveBeenCalledWith({
+        create: {
+          currency: 'BRL',
+          dataSource: DataSource.MANUAL,
+          symbol: 'TESOURO-SELIC-2029'
+        },
+        update: {},
+        where: {
+          dataSource_symbol: {
+            dataSource: DataSource.MANUAL,
+            symbol: 'TESOURO-SELIC-2029'
+          }
+        }
+      });
+      expect(
+        transactionClientMock.allocationTarget.createMany
+      ).toHaveBeenCalledWith({
+        data: [
+          {
+            minPurchaseValue: 0,
+            purchaseMode: PurchaseMode.CONTINUOUS,
+            symbolProfileId: 'profile-new',
+            targetPercentage: 100,
+            userId: 'user-1'
+          }
+        ]
+      });
+    });
   });
 });
