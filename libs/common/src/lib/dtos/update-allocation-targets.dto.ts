@@ -1,5 +1,3 @@
-import { IsCurrencyCode } from '@ghostfolio/common/validators/is-currency-code';
-
 import { DataSource, PurchaseMode } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
@@ -16,9 +14,6 @@ import {
 } from 'class-validator';
 
 export class AllocationTargetItemDto {
-  @IsCurrencyCode()
-  currency: string;
-
   @IsEnum(DataSource)
   dataSource: DataSource;
 

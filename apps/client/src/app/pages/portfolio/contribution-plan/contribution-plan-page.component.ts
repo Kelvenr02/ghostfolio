@@ -7,6 +7,7 @@ import { User } from '@ghostfolio/common/interfaces/user.interface';
 import { DataService } from '@ghostfolio/ui/services';
 
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectorRef, Component, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -39,11 +40,14 @@ import { EditAllocationTargetsDialogParams } from './edit-allocation-targets-dia
 })
 export class GfContributionPlanPageComponent {
   public contributionForm: FormGroup;
+  public errorMessage: string;
   public isCalculating = false;
   public isLoading = false;
   public plan: ContributionPlanResponse;
   public targets: AllocationTargetsResponse;
   public user: User;
+
+  private lastFailedAction?: () => void;
 
   public constructor(
     private changeDetectorRef: ChangeDetectorRef,
@@ -80,18 +84,34 @@ export class GfContributionPlanPageComponent {
     }
 
     this.isCalculating = true;
+    this.errorMessage = undefined;
 
     const { amount } = this.contributionForm.value;
 
     this.dataService
       .fetchContributionPlan({ amount })
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((plan) => {
-        this.plan = plan;
-        this.isCalculating = false;
+      .subscribe({
+        error: (error: HttpErrorResponse) => {
+          this.isCalculating = false;
+          this.errorMessage =
+            error?.error?.message ??
+            $localize`Não foi possível calcular o plano de aporte.`;
+          this.lastFailedAction = () => this.calculateContributionPlan();
 
-        this.changeDetectorRef.markForCheck();
+          this.changeDetectorRef.markForCheck();
+        },
+        next: (plan) => {
+          this.plan = plan;
+          this.isCalculating = false;
+
+          this.changeDetectorRef.markForCheck();
+        }
       });
+  }
+
+  public retryLastFailedAction() {
+    this.lastFailedAction?.();
   }
 
   public openEditAllocationTargetsDialog() {
@@ -118,15 +138,27 @@ export class GfContributionPlanPageComponent {
 
   private initializeAllocationTargets() {
     this.isLoading = true;
+    this.errorMessage = undefined;
 
     this.dataService
       .fetchAllocationTargets()
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((targets) => {
-        this.targets = targets;
-        this.isLoading = false;
+      .subscribe({
+        error: (error: HttpErrorResponse) => {
+          this.isLoading = false;
+          this.errorMessage =
+            error?.error?.message ??
+            $localize`Não foi possível carregar os alvos de alocação.`;
+          this.lastFailedAction = () => this.initializeAllocationTargets();
 
-        this.changeDetectorRef.markForCheck();
+          this.changeDetectorRef.markForCheck();
+        },
+        next: (targets) => {
+          this.targets = targets;
+          this.isLoading = false;
+
+          this.changeDetectorRef.markForCheck();
+        }
       });
   }
 }

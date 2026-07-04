@@ -3,6 +3,20 @@
     Planejador de aporte mensal
   </h1>
 
+  @if (errorMessage) {
+    <div class="alert alert-danger" role="alert">
+      <p class="mb-2">{{ errorMessage }}</p>
+      <button
+        color="primary"
+        mat-stroked-button
+        type="button"
+        (click)="retryLastFailedAction()"
+      >
+        <ng-container i18n>Tentar novamente</ng-container>
+      </button>
+    </div>
+  }
+
   @if (user?.settings?.isExperimentalFeatures) {
     @if (isLoading) {
       <div class="d-flex justify-content-center py-3">

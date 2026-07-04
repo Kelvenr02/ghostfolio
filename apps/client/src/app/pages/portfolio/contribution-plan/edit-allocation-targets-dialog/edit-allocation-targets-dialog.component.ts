@@ -10,6 +10,7 @@ import { GfSymbolAutocompleteComponent } from '@ghostfolio/ui/symbol-autocomplet
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   OnInit,
   inject
@@ -40,15 +41,6 @@ import { addOutline, closeOutline } from 'ionicons/icons';
 
 import { EditAllocationTargetsDialogParams } from './interfaces/interfaces';
 
-// The single-user, Brazil-only fork always persists BRL as the base
-// currency (see BASE_CURRENCY in contribution-plan.service.ts). The read
-// interface AllocationTarget does not carry a currency field, and the
-// backend upsert only writes `currency` when the SymbolProfile is created
-// for the first time (`update: {}`), so this placeholder is never actually
-// applied to an already-persisted asset - it only satisfies client-side DTO
-// validation for rows preloaded from existing targets.
-const FALLBACK_CURRENCY = 'BRL';
-
 const TARGET_PERCENTAGE_SUM_IN_CENTS = 10_000;
 
 @Component({
@@ -77,6 +69,7 @@ export class GfEditAllocationTargetsDialogComponent implements OnInit {
 
   protected readonly data =
     inject<EditAllocationTargetsDialogParams>(MAT_DIALOG_DATA);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly dataService = inject(DataService);
   private readonly dialogRef =
     inject<MatDialogRef<GfEditAllocationTargetsDialogComponent>>(MatDialogRef);
@@ -131,6 +124,10 @@ export class GfEditAllocationTargetsDialogComponent implements OnInit {
   }
 
   protected async onSubmit() {
+    if (this.isSubmitting) {
+      return;
+    }
+
     this.errorMessage = undefined;
 
     const targets: AllocationTargetItemDto[] = this.targetsRows.controls.map(
@@ -139,7 +136,6 @@ export class GfEditAllocationTargetsDialogComponent implements OnInit {
         const purchaseMode: PurchaseMode = group.get('purchaseMode')?.value;
 
         return {
-          currency: assetProfile?.currency ?? FALLBACK_CURRENCY,
           dataSource: assetProfile?.dataSource as DataSource,
           minPurchaseValue:
             purchaseMode === PurchaseMode.CONTINUOUS
@@ -164,6 +160,9 @@ export class GfEditAllocationTargetsDialogComponent implements OnInit {
       });
     } catch (error) {
       console.error(error);
+
+      this.errorMessage = $localize`Verifique os campos destacados: há dados inválidos ou incompletos nos alvos de alocação.`;
+      this.changeDetectorRef.markForCheck();
 
       return;
     }
@@ -192,8 +191,13 @@ export class GfEditAllocationTargetsDialogComponent implements OnInit {
     const isContinuous = purchaseMode === PurchaseMode.CONTINUOUS;
 
     const assetProfile: LookupItem = target
-      ? ({
-          currency: FALLBACK_CURRENCY,
+      ? // A moeda não é conhecida pelo cliente (a API não a expõe em
+        // AllocationTarget) e não é mais enviada ao servidor - o backend é a
+        // fonte autoritativa (ver FIX 1, contribution-plan.service.ts). Este
+        // placeholder só preenche o tipo LookupItem para pré-carregar a
+        // linha no gf-symbol-autocomplete; nunca é lido ou submetido.
+        ({
+          currency: '',
           dataSource: target.dataSource,
           name: target.name,
           symbol: target.symbol

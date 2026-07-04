@@ -7,7 +7,6 @@ import { ContributionPlanService } from './contribution-plan.service';
 
 function buildAllocationTargetItemDto(overrides: Record<string, unknown> = {}) {
   return {
-    currency: 'BRL',
     dataSource: DataSource.YAHOO,
     minPurchaseValue: undefined,
     purchaseMode: PurchaseMode.DISCRETE,
@@ -68,6 +67,7 @@ describe('ContributionPlanService', () => {
   let prismaServiceMock: {
     $transaction: jest.Mock;
     allocationTarget: { findMany: jest.Mock };
+    symbolProfile: { findMany: jest.Mock };
   };
   let service: ContributionPlanService;
 
@@ -108,6 +108,12 @@ describe('ContributionPlanService', () => {
     prismaServiceMock = {
       $transaction: jest.fn((callback) => callback(transactionClientMock)),
       allocationTarget: {
+        findMany: jest.fn().mockResolvedValue([])
+      },
+      symbolProfile: {
+        // By default there is no pre-existing SymbolProfile for any target,
+        // so replaceTargets must resolve every symbol's currency via
+        // dataProviderService.getQuotes (FIX 1).
         findMany: jest.fn().mockResolvedValue([])
       }
     };
@@ -498,7 +504,14 @@ describe('ContributionPlanService', () => {
       expect(prismaServiceMock.$transaction).not.toHaveBeenCalled();
     });
 
-    it('replaces the target set atomically inside a single $transaction: upserts SymbolProfile by dataSource_symbol, deletes the old targets, then recreates them', async () => {
+    it('replaces the target set atomically inside a single $transaction: upserts SymbolProfile by dataSource_symbol, deletes the old targets, then recreates them (symbol already known locally)', async () => {
+      prismaServiceMock.symbolProfile.findMany.mockResolvedValue([
+        {
+          currency: 'BRL',
+          dataSource: DataSource.YAHOO,
+          symbol: 'BOVA11.SA'
+        }
+      ]);
       transactionClientMock.allocationTarget.findMany.mockResolvedValue([
         buildTarget({
           id: 'target-1',
@@ -552,7 +565,18 @@ describe('ContributionPlanService', () => {
       expect(response.targets).toHaveLength(1);
     });
 
-    it('upserts a SymbolProfile for a symbol never traded locally (no pre-existing row)', async () => {
+    it('resolves the currency of a new symbol via dataProviderService.getQuotes and persists the provider currency (FIX 1: server is authoritative)', async () => {
+      dataProviderServiceMock.getQuotes.mockResolvedValue({
+        [getAssetProfileIdentifier({
+          dataSource: DataSource.MANUAL,
+          symbol: 'TESOURO-SELIC-2029'
+        })]: {
+          currency: 'BRL',
+          dataSource: DataSource.MANUAL,
+          marketPrice: 100,
+          marketState: 'closed'
+        }
+      });
       transactionClientMock.symbolProfile.upsert.mockResolvedValue({
         id: 'profile-new',
         currency: 'BRL',
@@ -585,6 +609,9 @@ describe('ContributionPlanService', () => {
         ]
       } as never);
 
+      expect(dataProviderServiceMock.getQuotes).toHaveBeenCalledWith({
+        items: [{ dataSource: DataSource.MANUAL, symbol: 'TESOURO-SELIC-2029' }]
+      });
       expect(transactionClientMock.symbolProfile.upsert).toHaveBeenCalledWith({
         create: {
           currency: 'BRL',
@@ -612,6 +639,67 @@ describe('ContributionPlanService', () => {
           }
         ]
       });
+    });
+
+    it('rejects with 422 CURRENCY_UNRESOLVED when a new symbol has no quote (or a quote without currency), and never opens the $transaction', async () => {
+      dataProviderServiceMock.getQuotes.mockResolvedValue({});
+
+      await expect(
+        service.replaceTargets('user-1', {
+          targets: [
+            buildAllocationTargetItemDto({
+              dataSource: DataSource.MANUAL,
+              purchaseMode: PurchaseMode.CONTINUOUS,
+              symbol: 'TESOURO-SELIC-2029',
+              targetPercentage: 100
+            })
+          ]
+        } as never)
+      ).rejects.toMatchObject({
+        status: 422,
+        response: expect.objectContaining({
+          code: 'CURRENCY_UNRESOLVED',
+          symbols: ['TESOURO-SELIC-2029']
+        })
+      });
+
+      expect(prismaServiceMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('does not call dataProviderService.getQuotes nor change the currency for an already-existing SymbolProfile', async () => {
+      prismaServiceMock.symbolProfile.findMany.mockResolvedValue([
+        {
+          currency: 'BRL',
+          dataSource: DataSource.YAHOO,
+          symbol: 'BOVA11.SA'
+        }
+      ]);
+      transactionClientMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({
+          id: 'target-1',
+          symbolProfileId: 'profile-BOVA11.SA',
+          targetPercentage: 100,
+          symbolProfile: {
+            id: 'profile-BOVA11.SA',
+            currency: 'BRL',
+            dataSource: DataSource.YAHOO,
+            name: undefined,
+            symbol: 'BOVA11.SA'
+          }
+        })
+      ]);
+
+      await service.replaceTargets('user-1', {
+        targets: [buildAllocationTargetItemDto({ targetPercentage: 100 })]
+      } as never);
+
+      expect(dataProviderServiceMock.getQuotes).not.toHaveBeenCalled();
+      expect(transactionClientMock.symbolProfile.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ currency: 'BRL' }),
+          update: {}
+        })
+      );
     });
   });
 });

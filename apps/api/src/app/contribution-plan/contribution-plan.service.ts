@@ -379,6 +379,85 @@ export class ContributionPlanService {
       seenIdentifiers.add(identifier);
     }
 
+    // FIX 1 (CRITICAL, moeda autoritativa do servidor): o cliente não é mais
+    // fonte de verdade para `currency` (o DTO não carrega mais esse campo -
+    // ver update-allocation-targets.dto.ts). Para símbolos que já têm
+    // SymbolProfile local, a moeda persistida é preservada (update: {} não a
+    // toca). Para símbolos novos, a moeda real é resolvida via UMA chamada
+    // batch a dataProviderService.getQuotes ANTES da transação; se algum
+    // símbolo novo não puder ter a moeda resolvida, falha alto (422
+    // CURRENCY_UNRESOLVED) em vez de persistir um SymbolProfile com moeda
+    // adivinhada.
+    const existingSymbolProfiles =
+      await this.prismaService.symbolProfile.findMany({
+        select: { currency: true, dataSource: true, symbol: true },
+        where: {
+          OR: targets.map((target) => ({
+            dataSource: target.dataSource,
+            symbol: target.symbol
+          }))
+        }
+      });
+
+    const currencyByIdentifier = new Map<string, string>();
+
+    for (const profile of existingSymbolProfiles) {
+      currencyByIdentifier.set(
+        getAssetProfileIdentifier({
+          dataSource: profile.dataSource,
+          symbol: profile.symbol
+        }),
+        profile.currency
+      );
+    }
+
+    const newTargets = targets.filter(
+      (target) =>
+        !currencyByIdentifier.has(
+          getAssetProfileIdentifier({
+            dataSource: target.dataSource,
+            symbol: target.symbol
+          })
+        )
+    );
+
+    if (newTargets.length > 0) {
+      const quotesByIdentifier = await this.dataProviderService.getQuotes({
+        items: newTargets.map((target) => ({
+          dataSource: target.dataSource,
+          symbol: target.symbol
+        }))
+      });
+
+      const unresolvedSymbols: string[] = [];
+
+      for (const target of newTargets) {
+        const identifier = getAssetProfileIdentifier({
+          dataSource: target.dataSource,
+          symbol: target.symbol
+        });
+        const quote = quotesByIdentifier[identifier];
+
+        if (!quote?.currency) {
+          unresolvedSymbols.push(target.symbol);
+          continue;
+        }
+
+        currencyByIdentifier.set(identifier, quote.currency);
+      }
+
+      if (unresolvedSymbols.length > 0) {
+        throw new HttpException(
+          {
+            code: 'CURRENCY_UNRESOLVED',
+            message: `Não foi possível resolver a moeda para: ${unresolvedSymbols.join(', ')}.`,
+            symbols: unresolvedSymbols
+          },
+          HttpStatus.UNPROCESSABLE_ENTITY
+        );
+      }
+    }
+
     return this.prismaService.$transaction(async (prisma) => {
       const symbolProfileIdByTarget = new Map<
         (typeof targets)[number],
@@ -386,9 +465,14 @@ export class ContributionPlanService {
       >();
 
       for (const target of targets) {
+        const identifier = getAssetProfileIdentifier({
+          dataSource: target.dataSource,
+          symbol: target.symbol
+        });
+
         const symbolProfile = await prisma.symbolProfile.upsert({
           create: {
-            currency: target.currency,
+            currency: currencyByIdentifier.get(identifier)!,
             dataSource: target.dataSource,
             symbol: target.symbol
           },
