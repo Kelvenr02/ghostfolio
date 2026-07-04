@@ -1,0 +1,121 @@
+<form
+  class="d-flex flex-column h-100"
+  [formGroup]="targetsForm"
+  (ngSubmit)="onSubmit()"
+>
+  <h1 i18n mat-dialog-title>Editar alvos de alocação</h1>
+  <div class="flex-grow-1 py-3" mat-dialog-content>
+    @if (errorMessage) {
+      <div class="alert alert-danger" role="alert">{{ errorMessage }}</div>
+    }
+
+    <div formArrayName="targets">
+      @for (targetGroup of targetsRows.controls; track $index) {
+        <div
+          class="align-items-start border-bottom d-flex mb-3 pb-3"
+          [formGroupName]="$index"
+        >
+          <mat-form-field appearance="outline" class="mr-2 w-100">
+            <mat-label i18n>Ativo</mat-label>
+            <gf-symbol-autocomplete formControlName="assetProfile" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="mr-2" style="width: 8rem">
+            <mat-label i18n>Alvo (%)</mat-label>
+            <input
+              formControlName="targetPercentage"
+              matInput
+              max="100"
+              min="0.01"
+              step="0.01"
+              type="number"
+              (keydown.enter)="$event.stopPropagation()"
+            />
+          </mat-form-field>
+
+          <mat-form-field
+            appearance="outline"
+            class="mr-2"
+            style="width: 10rem"
+          >
+            <mat-label i18n>Modo de compra</mat-label>
+            <mat-select formControlName="purchaseMode">
+              <mat-option i18n [value]="PurchaseMode.DISCRETE"
+                >Discreto</mat-option
+              >
+              <mat-option i18n [value]="PurchaseMode.CONTINUOUS"
+                >Contínuo</mat-option
+              >
+            </mat-select>
+          </mat-form-field>
+
+          @if (
+            targetGroup.get('purchaseMode')?.value === PurchaseMode.CONTINUOUS
+          ) {
+            <mat-form-field
+              appearance="outline"
+              class="mr-2"
+              style="width: 10rem"
+            >
+              <mat-label i18n>Mínimo (R$)</mat-label>
+              <input
+                formControlName="minPurchaseValue"
+                matInput
+                min="0"
+                step="0.01"
+                type="number"
+                (keydown.enter)="$event.stopPropagation()"
+              />
+            </mat-form-field>
+          }
+
+          <button
+            class="mt-2"
+            i18n-title
+            mat-icon-button
+            title="Remover alvo"
+            type="button"
+            [disabled]="targetsRows.length <= 1"
+            (click)="removeTarget($index)"
+          >
+            <ion-icon name="close-outline" />
+          </button>
+        </div>
+      }
+    </div>
+
+    <button class="mb-3" mat-stroked-button type="button" (click)="addTarget()">
+      <ion-icon class="mr-1" name="add-outline" />
+      <ng-container i18n>Adicionar alvo</ng-container>
+    </button>
+
+    <div
+      class="alert"
+      role="alert"
+      [class.alert-danger]="targetsRows.errors?.['sumOfTargetPercentages']"
+      [class.alert-success]="!targetsRows.errors?.['sumOfTargetPercentages']"
+    >
+      <ng-container i18n>Soma dos alvos:</ng-container>
+      {{ sumOfTargetPercentagesInCents / 100 | number: '1.2-2' }}%
+      @if (targetsRows.errors?.['sumOfTargetPercentages']) {
+        <span>
+          (<ng-container i18n>falta</ng-container>
+          {{ remainingPercentage | number: '1.2-2' }}%)
+        </span>
+      }
+    </div>
+  </div>
+  <div class="justify-content-end" mat-dialog-actions>
+    <button mat-button type="button" (click)="onCancel()">
+      <ng-container i18n>Cancelar</ng-container>
+    </button>
+    <button
+      color="primary"
+      mat-flat-button
+      type="submit"
+      [disabled]="targetsForm.invalid || isSubmitting"
+    >
+      <ng-container i18n>Salvar</ng-container>
+    </button>
+  </div>
+</form>

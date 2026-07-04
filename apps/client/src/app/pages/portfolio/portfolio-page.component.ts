@@ -12,6 +12,7 @@ import { addIcons } from 'ionicons';
 import {
   analyticsOutline,
   calculatorOutline,
+  cartOutline,
   pieChartOutline,
   receiptOutline,
   scanOutline,
@@ -57,6 +58,13 @@ export class PortfolioPageComponent {
                 internalRoutes.portfolio.subRoutes.allocations.routerLink
             },
             {
+              iconName: 'cart-outline',
+              label: internalRoutes.portfolio.subRoutes.contributionPlan.title,
+              routerLink:
+                internalRoutes.portfolio.subRoutes.contributionPlan.routerLink,
+              showCondition: !!state.user?.settings?.isExperimentalFeatures
+            },
+            {
               iconName: 'calculator-outline',
               label: internalRoutes.portfolio.subRoutes.fire.title,
               routerLink: internalRoutes.portfolio.subRoutes.fire.routerLink
@@ -81,6 +89,7 @@ export class PortfolioPageComponent {
     addIcons({
       analyticsOutline,
       calculatorOutline,
+      cartOutline,
       pieChartOutline,
       receiptOutline,
       scanOutline,

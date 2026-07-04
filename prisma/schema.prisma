@@ -64,6 +64,21 @@ model AccountBalance {
   @@index([date])
 }
 
+model AllocationTarget {
+  createdAt        DateTime      @default(now())
+  id               String        @id @default(uuid())
+  minPurchaseValue Float?
+  purchaseMode     PurchaseMode  @default(DISCRETE)
+  symbolProfile    SymbolProfile @relation(fields: [symbolProfileId], onDelete: Cascade, references: [id])
+  symbolProfileId  String
+  targetPercentage Float
+  updatedAt        DateTime      @updatedAt
+  user             User          @relation(fields: [userId], onDelete: Cascade, references: [id])
+  userId           String
+
+  @@unique([userId, symbolProfileId])
+}
+
 model Analytics {
   activityCount                       Int      @default(0)
   country                             String?
@@ -184,6 +199,7 @@ model Settings {
 
 model SymbolProfile {
   activities             Order[]
+  allocationTargets      AllocationTarget[]
   assetClass             AssetClass?
   assetSubClass          AssetSubClass?
   comment                String?
@@ -262,26 +278,27 @@ model Tag {
 }
 
 model User {
-  accessesGet   Access[]        @relation("accessGet")
-  accessesGive  Access[]        @relation("accessGive")
-  accessToken   String?
-  accounts      Account[]
-  activities    Order[]
-  analytics     Analytics?
-  apiKeys       ApiKey[]
-  authChallenge String?
-  authDevices   AuthDevice[]
-  createdAt     DateTime        @default(now())
-  id            String          @id @default(uuid())
-  provider      Provider        @default(ANONYMOUS)
-  role          Role            @default(USER)
-  settings      Settings?
-  subscriptions Subscription[]
-  tags          Tag[]
-  thirdPartyId  String?
-  updatedAt     DateTime        @updatedAt
-  watchlist     SymbolProfile[] @relation("UserWatchlist")
-  SymbolProfile SymbolProfile[]
+  accessesGet       Access[]           @relation("accessGet")
+  accessesGive      Access[]           @relation("accessGive")
+  accessToken       String?
+  accounts          Account[]
+  activities        Order[]
+  allocationTargets AllocationTarget[]
+  analytics         Analytics?
+  apiKeys           ApiKey[]
+  authChallenge     String?
+  authDevices       AuthDevice[]
+  createdAt         DateTime           @default(now())
+  id                String             @id @default(uuid())
+  provider          Provider           @default(ANONYMOUS)
+  role              Role               @default(USER)
+  settings          Settings?
+  subscriptions     Subscription[]
+  tags              Tag[]
+  thirdPartyId      String?
+  updatedAt         DateTime           @updatedAt
+  watchlist         SymbolProfile[]    @relation("UserWatchlist")
+  SymbolProfile     SymbolProfile[]
 
   @@index([accessToken])
   @@index([createdAt])
@@ -346,6 +363,11 @@ enum Provider {
   GOOGLE
   INTERNET_IDENTITY
   OIDC
+}
+
+enum PurchaseMode {
+  CONTINUOUS
+  DISCRETE
 }
 
 enum Role {

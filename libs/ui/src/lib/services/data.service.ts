@@ -9,6 +9,7 @@ import {
   TransferBalanceDto,
   UpdateAccessDto,
   UpdateAccountDto,
+  UpdateAllocationTargetsDto,
   UpdateBulkMarketDataDto,
   UpdateOrderDto,
   UpdateOwnAccessTokenDto,
@@ -26,6 +27,7 @@ import {
   ActivitiesResponse,
   ActivityResponse,
   AiPromptResponse,
+  AllocationTargetsResponse,
   ApiKeyResponse,
   AssetProfileIdentifier,
   AssetProfileResponse,
@@ -33,6 +35,8 @@ import {
   AssetResponse,
   BenchmarkMarketDataDetailsResponse,
   BenchmarkResponse,
+  ContributionPlanParameters,
+  ContributionPlanResponse,
   CreateStripeCheckoutSessionResponse,
   DataProviderHealthResponse,
   DataProviderHistoricalResponse,
@@ -741,6 +745,30 @@ export class DataService {
     return this.http.get<TaxBrReportResponse>('/api/v1/tax-br/report', {
       params
     });
+  }
+
+  public fetchContributionPlan({ amount }: ContributionPlanParameters) {
+    const params = new HttpParams().set('amount', amount.toString());
+
+    return this.http.get<ContributionPlanResponse>(
+      '/api/v1/contribution-plan',
+      { params }
+    );
+  }
+
+  public fetchAllocationTargets() {
+    return this.http.get<AllocationTargetsResponse>(
+      '/api/v1/contribution-plan/targets'
+    );
+  }
+
+  public putAllocationTargets(
+    aUpdateAllocationTargetsDto: UpdateAllocationTargetsDto
+  ) {
+    return this.http.put<AllocationTargetsResponse>(
+      '/api/v1/contribution-plan/targets',
+      aUpdateAllocationTargetsDto
+    );
   }
 
   public fetchPrompt({

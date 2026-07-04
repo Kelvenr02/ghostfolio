@@ -6,11 +6,13 @@ import type { AdminData } from './admin-data.interface';
 import type { AdminJobs } from './admin-jobs.interface';
 import type { AdminMarketDataDetails } from './admin-market-data-details.interface';
 import type { AdminUser } from './admin-user.interface';
+import type { AllocationTarget } from './allocation-target.interface';
 import type { AssetClassSelectorOption } from './asset-class-selector-option.interface';
 import type { AssetProfileIdentifier } from './asset-profile-identifier.interface';
 import type { AssetProfileItem } from './asset-profile-item.interface';
 import type { BenchmarkProperty } from './benchmark-property.interface';
 import type { Benchmark } from './benchmark.interface';
+import type { ContributionPlanParameters } from './contribution-plan-parameters.interface';
 import type { Coupon } from './coupon.interface';
 import type { DataProviderInfo } from './data-provider-info.interface';
 import type { EnhancedSymbolProfile } from './enhanced-symbol-profile.interface';
@@ -47,12 +49,19 @@ import type { AdminUserResponse } from './responses/admin-user-response.interfac
 import type { AdminUsersResponse } from './responses/admin-users-response.interface';
 import type { AiPromptResponse } from './responses/ai-prompt-response.interface';
 import type { AiServiceHealthResponse } from './responses/ai-service-health-response.interface';
+import type { AllocationTargetsResponse } from './responses/allocation-targets-response.interface';
 import type { ApiKeyResponse } from './responses/api-key-response.interface';
 import type { AssetProfileResponse } from './responses/asset-profile-response.interface';
 import type { AssetProfilesResponse } from './responses/asset-profiles-response.interface';
 import type { AssetResponse } from './responses/asset-response.interface';
 import type { BenchmarkMarketDataDetailsResponse } from './responses/benchmark-market-data-details-response.interface';
 import type { BenchmarkResponse } from './responses/benchmark-response.interface';
+import type {
+  ContributionPlanAllocation,
+  ContributionPlanOrder,
+  ContributionPlanResponse,
+  ContributionPlanWarning
+} from './responses/contribution-plan-response.interface';
 import type { CreateStripeCheckoutSessionResponse } from './responses/create-stripe-checkout-session-response.interface';
 import type { DataEnhancerHealthResponse } from './responses/data-enhancer-health-response.interface';
 import type { DataProviderGhostfolioAssetProfileResponse } from './responses/data-provider-ghostfolio-asset-profile-response.interface';
@@ -134,6 +143,8 @@ export {
   AdminUsersResponse,
   AiPromptResponse,
   AiServiceHealthResponse,
+  AllocationTarget,
+  AllocationTargetsResponse,
   ApiKeyResponse,
   AssertionCredentialJSON,
   AssetClassSelectorOption,
@@ -147,6 +158,11 @@ export {
   BenchmarkMarketDataDetailsResponse,
   BenchmarkProperty,
   BenchmarkResponse,
+  ContributionPlanAllocation,
+  ContributionPlanOrder,
+  ContributionPlanParameters,
+  ContributionPlanResponse,
+  ContributionPlanWarning,
   Coupon,
   CreateStripeCheckoutSessionResponse,
   DataEnhancerHealthResponse,

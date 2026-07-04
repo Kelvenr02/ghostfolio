@@ -1,0 +1,187 @@
+<div class="container">
+  <h1 class="d-none d-sm-block h3 mb-3 text-center" i18n>
+    Planejador de aporte mensal
+  </h1>
+
+  @if (errorMessage) {
+    <div class="alert alert-danger" role="alert">
+      <p class="mb-2">{{ errorMessage }}</p>
+      <button
+        color="primary"
+        mat-stroked-button
+        type="button"
+        (click)="retryLastFailedAction()"
+      >
+        <ng-container i18n>Tentar novamente</ng-container>
+      </button>
+    </div>
+  }
+
+  @if (user?.settings?.isExperimentalFeatures) {
+    @if (isLoading) {
+      <div class="d-flex justify-content-center py-3">
+        <ngx-skeleton-loader
+          animation="pulse"
+          [theme]="{ height: '2rem', width: '100%' }"
+        />
+      </div>
+    } @else if (!targets?.targets?.length) {
+      <div class="text-center py-4">
+        <p class="text-muted" i18n>
+          Nenhum alvo de alocação configurado ainda.
+        </p>
+        <button
+          color="primary"
+          mat-flat-button
+          (click)="openEditAllocationTargetsDialog()"
+        >
+          <ng-container i18n>Configurar alvos</ng-container>
+        </button>
+      </div>
+    } @else {
+      <form
+        class="align-items-start d-flex mb-3"
+        [formGroup]="contributionForm"
+        (ngSubmit)="calculateContributionPlan()"
+      >
+        <mat-form-field appearance="outline" class="mr-2 w-100">
+          <mat-label i18n>Valor do aporte</mat-label>
+          <input
+            formControlName="amount"
+            matInput
+            min="0"
+            step="0.01"
+            type="number"
+          />
+          <span matTextSuffix>BRL</span>
+        </mat-form-field>
+        <button
+          color="primary"
+          mat-flat-button
+          type="submit"
+          [disabled]="contributionForm.invalid || isCalculating"
+        >
+          <ng-container i18n>Calcular</ng-container>
+        </button>
+      </form>
+
+      @if (isCalculating) {
+        <div class="d-flex justify-content-center py-3">
+          <ngx-skeleton-loader
+            animation="pulse"
+            [theme]="{ height: '2rem', width: '100%' }"
+          />
+        </div>
+      } @else if (plan) {
+        @if (plan.residualAmount > 0) {
+          <div class="alert alert-info" role="alert">
+            <strong i18n>Resíduo não alocado neste mês:</strong>
+            {{ plan.residualAmount | currency: 'BRL' }}
+          </div>
+        }
+
+        @if (plan.warnings?.length > 0) {
+          <div class="alert alert-warning" role="alert">
+            <strong i18n>Avisos:</strong>
+            <ul class="mb-0">
+              @for (
+                warning of plan.warnings;
+                track warning.symbol + warning.code
+              ) {
+                <li>
+                  @if (warning.symbol) {
+                    <strong>{{ warning.symbol }}</strong> —
+                  }
+                  {{ warning.message }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <h2 class="h5" i18n>Ordens de compra</h2>
+        @if (plan.orders?.length > 0) {
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th i18n>Símbolo</th>
+                <th class="text-right" i18n>Quantidade</th>
+                <th class="text-right" i18n>Preço unitário</th>
+                <th class="text-right" i18n>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (order of plan.orders; track order.symbol) {
+                <tr>
+                  <td>{{ order.symbol }}</td>
+                  <td class="text-right">{{ order.quantity ?? '-' }}</td>
+                  <td class="text-right">
+                    @if (order.unitPrice != null) {
+                      {{ order.unitPrice | currency: 'BRL' }}
+                    } @else {
+                      -
+                    }
+                  </td>
+                  <td class="text-right">
+                    {{ order.amount | currency: 'BRL' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="text-muted" i18n>Nenhuma ordem de compra neste aporte.</p>
+        }
+
+        <h2 class="h5" i18n>Alocações</h2>
+        @if (plan.allocations?.length > 0) {
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th i18n>Ativo</th>
+                <th class="text-right" i18n>Alvo %</th>
+                <th class="text-right" i18n>Antes %</th>
+                <th class="text-right" i18n>Depois %</th>
+                <th class="text-right" i18n>Desvio</th>
+                <th class="text-right" i18n>Gap restante (R$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (allocation of plan.allocations; track allocation.symbol) {
+                <tr>
+                  <td>{{ allocation.symbol }}</td>
+                  <td class="text-right">
+                    {{ allocation.targetPercentage | number: '1.2-2' }}%
+                  </td>
+                  <td class="text-right">
+                    {{
+                      allocation.allocationBeforeInPercentage | number: '1.2-2'
+                    }}%
+                  </td>
+                  <td class="text-right">
+                    {{
+                      allocation.allocationAfterInPercentage | number: '1.2-2'
+                    }}%
+                  </td>
+                  <td class="text-right">
+                    {{
+                      allocation.deviationAfterInPercentage | number: '1.2-2'
+                    }}%
+                  </td>
+                  <td class="text-right">
+                    {{ allocation.remainingGapAmount | currency: 'BRL' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      }
+    }
+  } @else {
+    <p class="text-muted" i18n>
+      Ative "Experimental Features" nas configurações da conta para acessar o
+      planejador de aporte.
+    </p>
+  }
+</div>
