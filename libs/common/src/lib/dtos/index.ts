@@ -13,6 +13,10 @@ import { DeleteOwnUserDto } from './delete-own-user.dto';
 import { TransferBalanceDto } from './transfer-balance.dto';
 import { UpdateAccessDto } from './update-access.dto';
 import { UpdateAccountDto } from './update-account.dto';
+import {
+  AllocationTargetItemDto,
+  UpdateAllocationTargetsDto
+} from './update-allocation-targets.dto';
 import { UpdateAssetProfileDataDto } from './update-asset-profile-data.dto';
 import { UpdateAssetProfileDto } from './update-asset-profile.dto';
 import { UpdateBulkMarketDataDto } from './update-bulk-market-data.dto';
@@ -25,6 +29,7 @@ import { UpdateTagDto } from './update-tag.dto';
 import { UpdateUserSettingDto } from './update-user-setting.dto';
 
 export {
+  AllocationTargetItemDto,
   AuthDeviceDto,
   CreateAccessDto,
   CreateAccountBalanceDto,
@@ -40,6 +45,7 @@ export {
   TransferBalanceDto,
   UpdateAccessDto,
   UpdateAccountDto,
+  UpdateAllocationTargetsDto,
   UpdateAssetProfileDataDto,
   UpdateAssetProfileDto,
   UpdateBulkMarketDataDto,

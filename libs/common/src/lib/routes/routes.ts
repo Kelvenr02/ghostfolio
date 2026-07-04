@@ -137,6 +137,11 @@ export const internalRoutes = {
         routerLink: ['/portfolio'],
         title: $localize`Analysis`
       },
+      contributionPlan: {
+        path: 'contribution-plan',
+        routerLink: ['/portfolio', 'contribution-plan'],
+        title: $localize`Planejador de aporte`
+      },
       fire: {
         path: 'fire',
         routerLink: ['/portfolio', 'fire'],

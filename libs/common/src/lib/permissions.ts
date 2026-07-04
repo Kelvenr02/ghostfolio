@@ -6,6 +6,7 @@ export const permissions = {
   accessAdminControl: 'accessAdminControl',
   accessAdminControlBullBoard: 'accessAdminControlBullBoard',
   accessAssistant: 'accessAssistant',
+  accessContributionPlan: 'accessContributionPlan',
   accessHoldingsChart: 'accessHoldingsChart',
   accessTaxBrReport: 'accessTaxBrReport',
   createAccess: 'createAccess',
@@ -72,6 +73,7 @@ export function getPermissions(aRole: Role): string[] {
       return [
         permissions.accessAdminControl,
         permissions.accessAssistant,
+        permissions.accessContributionPlan,
         permissions.accessHoldingsChart,
         permissions.accessTaxBrReport,
         permissions.createAccess,
@@ -124,6 +126,7 @@ export function getPermissions(aRole: Role): string[] {
     case 'USER':
       return [
         permissions.accessAssistant,
+        permissions.accessContributionPlan,
         permissions.accessHoldingsChart,
         permissions.accessTaxBrReport,
         permissions.createAccess,

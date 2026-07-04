@@ -463,6 +463,7 @@ export class UserService {
     if (!(user.settings.settings as UserSettings).isExperimentalFeatures) {
       currentPermissions = without(
         currentPermissions,
+        permissions.accessContributionPlan,
         permissions.accessTaxBrReport
       );
     }
