@@ -7,6 +7,7 @@ import { permissions } from '@ghostfolio/common/permissions';
 import type { RequestWithUser } from '@ghostfolio/common/types';
 
 import {
+  BadRequestException,
   Controller,
   Get,
   Headers,
@@ -53,9 +54,9 @@ export class TaxBrController {
     } else {
       year =
         yearParam != null
-          ? Number(yearParam)
+          ? this.parseYear(yearParam)
           : Number(toBrtCalendarDate(new Date()).slice(0, 4));
-      month = monthParam != null ? Number(monthParam) : undefined;
+      month = monthParam != null ? this.parseMonth(monthParam) : undefined;
     }
 
     return this.taxBrReportService.getReport({
@@ -63,5 +64,27 @@ export class TaxBrController {
       year,
       userId: impersonationUserId || this.request.user.id
     });
+  }
+
+  private parseYear(yearParam: string): number {
+    const year = Number(yearParam);
+
+    if (!Number.isInteger(year) || year < 1900 || year > 9999) {
+      throw new BadRequestException('year must be a 4-digit integer');
+    }
+
+    return year;
+  }
+
+  private parseMonth(monthParam: string): number {
+    const month = Number(monthParam);
+
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException(
+        'month must be an integer between 1 and 12'
+      );
+    }
+
+    return month;
   }
 }

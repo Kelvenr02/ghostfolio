@@ -25,6 +25,8 @@ import {
 } from './fii-income.helper';
 import { FixedIncomeTaxCalculatorService } from './fixed-income-tax-calculator.service';
 import {
+  IEquityDataWarning,
+  IFixedIncomeDataWarning,
   IFixedIncomeLot,
   IFixedIncomeRedemptionSlice,
   ISymbolClassification,
@@ -69,13 +71,19 @@ export class TaxBrReportService {
     const taxActivities = this.mapToTaxActivities(activities);
     const classifications = resolveSymbolClassifications(taxActivities);
 
-    const { realizedEvents, symbolStates } =
-      this.equityTaxCalculatorService.compute(taxActivities, classifications);
-    const { openLots, redemptionSlices } =
-      this.fixedIncomeTaxCalculatorService.compute(
-        taxActivities,
-        classifications
-      );
+    const {
+      dataWarnings: equityDataWarnings,
+      realizedEvents,
+      symbolStates
+    } = this.equityTaxCalculatorService.compute(taxActivities, classifications);
+    const {
+      dataWarnings: fixedIncomeDataWarnings,
+      openLots,
+      redemptionSlices
+    } = this.fixedIncomeTaxCalculatorService.compute(
+      taxActivities,
+      classifications
+    );
     const fiiIncomeByMonth = summarizeFiiIncomeByMonth(
       taxActivities,
       classifications
@@ -104,7 +112,11 @@ export class TaxBrReportService {
         FIXED_INCOME_REDEMPTION_ASSUMPTION
       ],
       baseCurrency: 'BRL',
-      classificationWarnings: this.buildClassificationWarnings(classifications),
+      classificationWarnings: this.buildClassificationWarnings(
+        classifications,
+        equityDataWarnings,
+        fixedIncomeDataWarnings
+      ),
       equityHoldings: this.buildEquityHoldings(symbolStates, classifications),
       generatedAt: new Date().toISOString(),
       openFixedIncomeLots: this.buildOpenFixedIncomeLots(openLots),
@@ -132,7 +144,9 @@ export class TaxBrReportService {
   }
 
   private buildClassificationWarnings(
-    classifications: Map<string, ISymbolClassification>
+    classifications: Map<string, ISymbolClassification>,
+    equityDataWarnings: IEquityDataWarning[],
+    fixedIncomeDataWarnings: IFixedIncomeDataWarning[]
   ): TaxBrClassificationWarning[] {
     const warnings: TaxBrClassificationWarning[] = [];
 
@@ -151,6 +165,24 @@ export class TaxBrReportService {
           symbol: classification.symbol
         });
       }
+    }
+
+    for (const warning of equityDataWarnings) {
+      warnings.push({
+        dataSource: warning.dataSource,
+        date: warning.dateBrt,
+        reason: warning.reason,
+        symbol: warning.symbol
+      });
+    }
+
+    for (const warning of fixedIncomeDataWarnings) {
+      warnings.push({
+        dataSource: warning.dataSource,
+        date: warning.dateBrt,
+        reason: warning.reason,
+        symbol: warning.symbol
+      });
     }
 
     return warnings;

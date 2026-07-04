@@ -354,8 +354,64 @@ describe('FixedIncomeTaxCalculatorService', () => {
     // separate file) is the only place a DARF total is ever computed.
     expect(result.redemptionSlices[0].taxWithheldBrl.toString()).toBe('22.5');
     expect(Object.keys(result).sort()).toEqual([
+      'dataWarnings',
       'openLots',
       'redemptionSlices'
     ]);
+  });
+
+  it('flags a warning when a redemption has no matching lot for that symbol', () => {
+    const activities = [
+      buildActivity({
+        id: 'sell-1',
+        dateBrt: '2026-06-30',
+        grossValueBrl: new Big(1000),
+        quantity: new Big(10),
+        type: ActivityType.SELL
+      })
+    ];
+
+    const { dataWarnings, redemptionSlices } = service.compute(
+      activities,
+      buildClassifications('MANUAL-TESOURO-SELIC-2029')
+    );
+
+    expect(redemptionSlices).toHaveLength(0);
+    expect(dataWarnings).toEqual([
+      {
+        assetProfileIdentifier: 'MANUAL-TESOURO-SELIC-2029',
+        dataSource: DataSource.MANUAL,
+        dateBrt: '2026-06-30',
+        reason: 'REDEEMED_WITHOUT_PRIOR_LOT',
+        symbol: 'TESOURO-SELIC-2029'
+      }
+    ]);
+  });
+
+  it('flags a warning for the unmatched remainder when a redemption exceeds all available lot quantity', () => {
+    const activities = [
+      buildActivity({
+        id: 'buy-1',
+        dateBrt: '2026-01-01',
+        grossValueBrl: new Big(500),
+        quantity: new Big(5)
+      }),
+      buildActivity({
+        id: 'sell-1',
+        dateBrt: '2026-06-30',
+        grossValueBrl: new Big(1000),
+        quantity: new Big(10),
+        type: ActivityType.SELL
+      })
+    ];
+
+    const { dataWarnings, redemptionSlices } = service.compute(
+      activities,
+      buildClassifications('MANUAL-TESOURO-SELIC-2029')
+    );
+
+    expect(redemptionSlices).toHaveLength(1);
+    expect(dataWarnings).toHaveLength(1);
+    expect(dataWarnings[0].reason).toBe('REDEEMED_WITHOUT_PRIOR_LOT');
   });
 });

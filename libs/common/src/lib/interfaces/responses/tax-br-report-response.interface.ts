@@ -88,8 +88,14 @@ export interface TaxBrMonthSummary {
 
 export interface TaxBrClassificationWarning {
   conflictingTagNames?: string[];
+  date?: string;
   dataSource: DataSource;
-  reason: 'UNCLASSIFIED' | 'CONFLICTING_TAGS';
+  reason:
+    | 'UNCLASSIFIED'
+    | 'CONFLICTING_TAGS'
+    | 'SAME_DAY_ACTIVITY'
+    | 'SOLD_WITHOUT_PRIOR_PURCHASE'
+    | 'REDEEMED_WITHOUT_PRIOR_LOT';
   symbol: string;
 }
 

@@ -211,4 +211,54 @@ describe('TaxBrReportService', () => {
     expect(july.darf.isPayable).toBe(true);
     expect(report.classificationWarnings).toEqual([]);
   });
+
+  it('surfaces data-integrity warnings from both the equity and fixed-income engines', async () => {
+    activitiesServiceMock.getActivities.mockResolvedValue({
+      activities: [
+        // sell with no prior buy for this equity symbol
+        buildRawActivity({
+          id: 'etf-sell',
+          date: new Date('2026-07-10T12:00:00.000Z'),
+          quantity: 10,
+          tags: [{ name: 'ETF' }],
+          type: ActivityType.SELL,
+          valueInBaseCurrency: 1500,
+          SymbolProfile: { dataSource: DataSource.YAHOO, symbol: 'BOVA11.SA' }
+        }),
+        // redemption with no prior lot for this fixed-income symbol
+        buildRawActivity({
+          id: 'rf-sell',
+          date: new Date('2026-07-10T12:00:00.000Z'),
+          quantity: 10,
+          tags: [{ name: 'RendaFixa' }],
+          type: ActivityType.SELL,
+          valueInBaseCurrency: 1100,
+          SymbolProfile: {
+            dataSource: DataSource.MANUAL,
+            symbol: 'TESOURO-SELIC-2029'
+          }
+        })
+      ],
+      count: 2
+    });
+
+    const report = await service.getReport({
+      userId: 'user-1',
+      year: 2026,
+      month: 7
+    });
+
+    expect(report.classificationWarnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'SOLD_WITHOUT_PRIOR_PURCHASE',
+          symbol: 'BOVA11.SA'
+        }),
+        expect.objectContaining({
+          reason: 'REDEEMED_WITHOUT_PRIOR_LOT',
+          symbol: 'TESOURO-SELIC-2029'
+        })
+      ])
+    );
+  });
 });

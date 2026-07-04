@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Big } from 'big.js';
 
 import {
+  IEquityDataWarning,
   IEquityRealizedEvent,
   IEquitySymbolState,
-  ISameDayEquityWarning,
   ISymbolClassification,
   ITaxActivity
 } from './interfaces/interfaces';
@@ -15,8 +15,8 @@ export class EquityTaxCalculatorService {
     activities: ITaxActivity[],
     classifications: Map<string, ISymbolClassification>
   ): {
+    dataWarnings: IEquityDataWarning[];
     realizedEvents: IEquityRealizedEvent[];
-    sameDayWarnings: ISameDayEquityWarning[];
     symbolStates: Map<string, IEquitySymbolState>;
   } {
     const equityActivities = activities
@@ -35,7 +35,8 @@ export class EquityTaxCalculatorService {
       })
       .sort((a, b) => a.dateBrt.localeCompare(b.dateBrt));
 
-    const sameDayWarnings = this.detectSameDayWarnings(equityActivities);
+    const dataWarnings: IEquityDataWarning[] =
+      this.detectSameDayWarnings(equityActivities);
 
     const symbolStates = new Map<string, IEquitySymbolState>();
     const realizedEvents: IEquityRealizedEvent[] = [];
@@ -48,6 +49,16 @@ export class EquityTaxCalculatorService {
         'RENDA_FIXA' | null
       >;
       const priorState = symbolStates.get(assetProfileIdentifier);
+
+      if (activity.type === 'SELL' && priorState == null) {
+        dataWarnings.push({
+          assetProfileIdentifier,
+          dataSource: activity.dataSource,
+          dateBrt: activity.dateBrt,
+          reason: 'SOLD_WITHOUT_PRIOR_PURCHASE',
+          symbol: activity.symbol
+        });
+      }
 
       if (activity.type === 'BUY') {
         const costBasisBrl = (priorState?.costBasisBrl ?? new Big(0))
@@ -111,16 +122,17 @@ export class EquityTaxCalculatorService {
       }
     }
 
-    return { realizedEvents, sameDayWarnings, symbolStates };
+    return { dataWarnings, realizedEvents, symbolStates };
   }
 
   private detectSameDayWarnings(
     activities: ITaxActivity[]
-  ): ISameDayEquityWarning[] {
+  ): IEquityDataWarning[] {
     const typesBySymbolAndDate = new Map<
       string,
       {
         assetProfileIdentifier: string;
+        dataSource: ITaxActivity['dataSource'];
         dateBrt: string;
         symbol: string;
         types: Set<string>;
@@ -132,6 +144,7 @@ export class EquityTaxCalculatorService {
       const key = `${assetProfileIdentifier}|${activity.dateBrt}`;
       const entry = typesBySymbolAndDate.get(key) ?? {
         assetProfileIdentifier,
+        dataSource: activity.dataSource,
         dateBrt: activity.dateBrt,
         symbol: activity.symbol,
         types: new Set<string>()
@@ -141,13 +154,15 @@ export class EquityTaxCalculatorService {
       typesBySymbolAndDate.set(key, entry);
     }
 
-    const warnings: ISameDayEquityWarning[] = [];
+    const warnings: IEquityDataWarning[] = [];
 
     for (const entry of typesBySymbolAndDate.values()) {
       if (entry.types.has('BUY') && entry.types.has('SELL')) {
         warnings.push({
           assetProfileIdentifier: entry.assetProfileIdentifier,
+          dataSource: entry.dataSource,
           dateBrt: entry.dateBrt,
+          reason: 'SAME_DAY_ACTIVITY',
           symbol: entry.symbol
         });
       }

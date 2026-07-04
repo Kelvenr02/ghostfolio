@@ -1,6 +1,7 @@
 import { HAS_PERMISSION_KEY } from '@ghostfolio/api/decorators/has-permission.decorator';
 import { permissions } from '@ghostfolio/common/permissions';
 
+import { BadRequestException } from '@nestjs/common';
 import 'reflect-metadata';
 
 import { TaxBrController } from './tax-br.controller';
@@ -67,5 +68,67 @@ describe('TaxBrController', () => {
       year: 2025,
       month: undefined
     });
+  });
+
+  it('rejects a non-numeric year instead of silently producing an invalid report', async () => {
+    const impersonationServiceMock = {
+      validateImpersonationId: jest.fn().mockResolvedValue(undefined)
+    };
+    const taxBrReportServiceMock = {
+      getReport: jest.fn().mockResolvedValue({})
+    };
+    const requestMock = { user: { id: 'user-1' } };
+
+    const controller = new TaxBrController(
+      impersonationServiceMock as never,
+      requestMock as never,
+      taxBrReportServiceMock as never
+    );
+
+    await expect(
+      controller.getReport(undefined, 'abc', undefined)
+    ).rejects.toThrow(BadRequestException);
+    expect(taxBrReportServiceMock.getReport).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty-string year instead of silently coercing it to zero', async () => {
+    const impersonationServiceMock = {
+      validateImpersonationId: jest.fn().mockResolvedValue(undefined)
+    };
+    const taxBrReportServiceMock = {
+      getReport: jest.fn().mockResolvedValue({})
+    };
+    const requestMock = { user: { id: 'user-1' } };
+
+    const controller = new TaxBrController(
+      impersonationServiceMock as never,
+      requestMock as never,
+      taxBrReportServiceMock as never
+    );
+
+    await expect(
+      controller.getReport(undefined, '', undefined)
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects a month outside the 1-12 range', async () => {
+    const impersonationServiceMock = {
+      validateImpersonationId: jest.fn().mockResolvedValue(undefined)
+    };
+    const taxBrReportServiceMock = {
+      getReport: jest.fn().mockResolvedValue({})
+    };
+    const requestMock = { user: { id: 'user-1' } };
+
+    const controller = new TaxBrController(
+      impersonationServiceMock as never,
+      requestMock as never,
+      taxBrReportServiceMock as never
+    );
+
+    await expect(controller.getReport(undefined, '2026', '13')).rejects.toThrow(
+      BadRequestException
+    );
+    expect(taxBrReportServiceMock.getReport).not.toHaveBeenCalled();
   });
 });

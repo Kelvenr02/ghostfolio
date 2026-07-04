@@ -1,6 +1,7 @@
 import { Big } from 'big.js';
 
 import {
+  getFixedIncomeRateBracket,
   lastWeekdayOfMonth,
   roundToCents,
   toBrtCalendarDate
@@ -52,5 +53,49 @@ describe('lastWeekdayOfMonth', () => {
   it('rolls back to Friday when the last day of the month is a Sunday', () => {
     // May 31, 2026 is a Sunday
     expect(lastWeekdayOfMonth(2026, 5)).toBe('2026-05-29');
+  });
+});
+
+describe('getFixedIncomeRateBracket', () => {
+  it('returns 22.5 percent for exactly 180 days', () => {
+    expect(getFixedIncomeRateBracket(180)).toEqual({
+      bracket: 'UP_TO_180',
+      ratePercent: 22.5
+    });
+  });
+
+  it('returns 20 percent for exactly 181 days', () => {
+    expect(getFixedIncomeRateBracket(181)).toEqual({
+      bracket: '181_TO_360',
+      ratePercent: 20
+    });
+  });
+
+  it('returns 20 percent for exactly 360 days', () => {
+    expect(getFixedIncomeRateBracket(360)).toEqual({
+      bracket: '181_TO_360',
+      ratePercent: 20
+    });
+  });
+
+  it('returns 17.5 percent for exactly 361 days', () => {
+    expect(getFixedIncomeRateBracket(361)).toEqual({
+      bracket: '361_TO_720',
+      ratePercent: 17.5
+    });
+  });
+
+  it('returns 17.5 percent for exactly 720 days', () => {
+    expect(getFixedIncomeRateBracket(720)).toEqual({
+      bracket: '361_TO_720',
+      ratePercent: 17.5
+    });
+  });
+
+  it('returns 15 percent for 721 days and beyond', () => {
+    expect(getFixedIncomeRateBracket(721)).toEqual({
+      bracket: 'OVER_720',
+      ratePercent: 15
+    });
   });
 });

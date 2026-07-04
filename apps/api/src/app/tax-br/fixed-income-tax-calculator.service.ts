@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Big } from 'big.js';
 
 import {
-  FixedIncomeRateBracket,
+  IFixedIncomeDataWarning,
   IFixedIncomeLot,
   IFixedIncomeRedemptionSlice,
   ISymbolClassification,
   ITaxActivity
 } from './interfaces/interfaces';
-import { FIXED_INCOME_RATE_BRACKETS } from './tax-br.constants';
+import { getFixedIncomeRateBracket } from './tax-br.helper';
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -18,6 +18,7 @@ export class FixedIncomeTaxCalculatorService {
     activities: ITaxActivity[],
     classifications: Map<string, ISymbolClassification>
   ): {
+    dataWarnings: IFixedIncomeDataWarning[];
     openLots: IFixedIncomeLot[];
     redemptionSlices: IFixedIncomeRedemptionSlice[];
   } {
@@ -38,6 +39,7 @@ export class FixedIncomeTaxCalculatorService {
 
     const lotsBySymbol = new Map<string, IFixedIncomeLot[]>();
     const redemptionSlices: IFixedIncomeRedemptionSlice[] = [];
+    const dataWarnings: IFixedIncomeDataWarning[] = [];
 
     for (const activity of fixedIncomeActivities) {
       const assetProfileIdentifier = `${activity.dataSource}-${activity.symbol}`;
@@ -68,9 +70,11 @@ export class FixedIncomeTaxCalculatorService {
           : netRedemptionValueBrl.div(activity.quantity);
 
         let quantityToRedeem = activity.quantity;
+        const updatedLots: IFixedIncomeLot[] = [];
 
         for (const lot of lots) {
           if (quantityToRedeem.lte(0) || lot.remainingQuantity.lte(0)) {
+            updatedLots.push(lot);
             continue;
           }
 
@@ -88,7 +92,7 @@ export class FixedIncomeTaxCalculatorService {
               MILLISECONDS_PER_DAY
           );
 
-          const { bracket, ratePercent } = this.getRateBracket(daysHeld);
+          const { bracket, ratePercent } = getFixedIncomeRateBracket(daysHeld);
 
           redemptionSlices.push({
             daysHeld,
@@ -105,32 +109,35 @@ export class FixedIncomeTaxCalculatorService {
             yieldBrl
           });
 
-          lot.remainingQuantity = lot.remainingQuantity.minus(unitsFromLot);
-          lot.remainingPrincipalBrl =
-            lot.remainingPrincipalBrl.minus(principalConsumedBrl);
+          updatedLots.push({
+            ...lot,
+            remainingPrincipalBrl:
+              lot.remainingPrincipalBrl.minus(principalConsumedBrl),
+            remainingQuantity: lot.remainingQuantity.minus(unitsFromLot)
+          });
+
           quantityToRedeem = quantityToRedeem.minus(unitsFromLot);
+        }
+
+        if (quantityToRedeem.gt(0)) {
+          dataWarnings.push({
+            assetProfileIdentifier,
+            dataSource: activity.dataSource,
+            dateBrt: activity.dateBrt,
+            reason: 'REDEEMED_WITHOUT_PRIOR_LOT',
+            symbol: activity.symbol
+          });
         }
 
         lotsBySymbol.set(
           assetProfileIdentifier,
-          lots.filter((lot) => lot.remainingQuantity.gt(0))
+          updatedLots.filter((lot) => lot.remainingQuantity.gt(0))
         );
       }
     }
 
     const openLots = Array.from(lotsBySymbol.values()).flat();
 
-    return { openLots, redemptionSlices };
-  }
-
-  private getRateBracket(daysHeld: number): {
-    bracket: FixedIncomeRateBracket;
-    ratePercent: 22.5 | 20 | 17.5 | 15;
-  } {
-    const match = FIXED_INCOME_RATE_BRACKETS.find(
-      ({ maxDays }) => maxDays === null || daysHeld <= maxDays
-    );
-
-    return { bracket: match.bracket, ratePercent: match.ratePercent };
+    return { dataWarnings, openLots, redemptionSlices };
   }
 }

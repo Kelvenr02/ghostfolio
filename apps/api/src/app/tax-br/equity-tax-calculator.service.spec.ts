@@ -297,17 +297,50 @@ describe('EquityTaxCalculatorService', () => {
       })
     ];
 
-    const { sameDayWarnings } = service.compute(
+    const { dataWarnings } = service.compute(
       activities,
       buildClassifications('YAHOO-BOVA11.SA')
     );
 
-    expect(sameDayWarnings).toEqual([
+    expect(dataWarnings).toEqual([
       {
         assetProfileIdentifier: 'YAHOO-BOVA11.SA',
+        dataSource: DataSource.YAHOO,
         dateBrt: '2026-07-01',
+        reason: 'SAME_DAY_ACTIVITY',
         symbol: 'BOVA11.SA'
       }
     ]);
+  });
+
+  it('flags a warning and treats cost as zero when a sell has no prior purchase history for that symbol', () => {
+    const activities = [
+      buildActivity({
+        id: 'sell-1',
+        dateBrt: '2026-07-10',
+        grossValueBrl: new Big(1000),
+        quantity: new Big(10),
+        type: ActivityType.SELL
+      })
+    ];
+
+    const { dataWarnings, realizedEvents } = service.compute(
+      activities,
+      buildClassifications('YAHOO-BOVA11.SA')
+    );
+
+    expect(dataWarnings).toEqual([
+      {
+        assetProfileIdentifier: 'YAHOO-BOVA11.SA',
+        dataSource: DataSource.YAHOO,
+        dateBrt: '2026-07-10',
+        reason: 'SOLD_WITHOUT_PRIOR_PURCHASE',
+        symbol: 'BOVA11.SA'
+      }
+    ]);
+    // documented fallback behavior: with no cost basis on record, the full
+    // net sale value is reported as realized gain -- the warning above is
+    // what keeps this from being a silent miscalculation.
+    expect(realizedEvents[0].realizedGainBrl.toString()).toBe('1000');
   });
 });

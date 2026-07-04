@@ -88,8 +88,22 @@ export interface IFiiIncomeEvent {
   yearMonth: string;
 }
 
-export interface ISameDayEquityWarning {
+export type EquityDataWarningReason =
+  | 'SAME_DAY_ACTIVITY'
+  | 'SOLD_WITHOUT_PRIOR_PURCHASE';
+
+export interface IEquityDataWarning {
   assetProfileIdentifier: string;
+  dataSource: DataSource;
   dateBrt: string;
+  reason: EquityDataWarningReason;
+  symbol: string;
+}
+
+export interface IFixedIncomeDataWarning {
+  assetProfileIdentifier: string;
+  dataSource: DataSource;
+  dateBrt: string;
+  reason: 'REDEEMED_WITHOUT_PRIOR_LOT';
   symbol: string;
 }

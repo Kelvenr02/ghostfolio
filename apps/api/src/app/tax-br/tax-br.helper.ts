@@ -1,5 +1,8 @@
 import { Big } from 'big.js';
 
+import { FixedIncomeRateBracket } from './interfaces/interfaces';
+import { FIXED_INCOME_RATE_BRACKETS } from './tax-br.constants';
+
 const BRT_OFFSET_IN_MILLISECONDS = 3 * 60 * 60 * 1000;
 
 export function toBrtCalendarDate(date: Date): string {
@@ -35,4 +38,15 @@ export function lastWeekdayOfMonth(year: number, month: number): string {
   const resultDay = String(lastDay.getUTCDate()).padStart(2, '0');
 
   return `${resultYear}-${resultMonth}-${resultDay}`;
+}
+
+export function getFixedIncomeRateBracket(daysHeld: number): {
+  bracket: FixedIncomeRateBracket;
+  ratePercent: 22.5 | 20 | 17.5 | 15;
+} {
+  const match = FIXED_INCOME_RATE_BRACKETS.find(
+    ({ maxDays }) => maxDays === null || daysHeld <= maxDays
+  );
+
+  return { bracket: match.bracket, ratePercent: match.ratePercent };
 }
