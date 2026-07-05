@@ -25,7 +25,6 @@ export class SgsIndexBuilderService {
   }: {
     anchor?: IIndexAnchor;
     config: ISgsSeriesConfig;
-    from: Date;
     observations: ISgsObservation[];
     to: Date;
   }): IIndexPoint[] {

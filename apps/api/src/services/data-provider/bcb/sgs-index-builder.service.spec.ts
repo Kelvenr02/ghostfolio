@@ -61,7 +61,6 @@ describe('SgsIndexBuilderService', () => {
     it('starts at base 100 on the first observation date when there is no anchor', () => {
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.CDI,
-        from: new Date('2026-06-01T00:00:00'),
         observations: toObservations(CDI_JUNE_2026),
         to: new Date('2026-06-30T00:00:00')
       });
@@ -73,7 +72,6 @@ describe('SgsIndexBuilderService', () => {
     it('emits one point per calendar day up to "to", carrying over weekends and holidays', () => {
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.CDI,
-        from: new Date('2026-06-01T00:00:00'),
         observations: toObservations(CDI_JUNE_2026),
         to: new Date('2026-06-30T00:00:00')
       });
@@ -96,7 +94,6 @@ describe('SgsIndexBuilderService', () => {
     it('matches the closed-form product for the real June 2026 sample within 1e-6', () => {
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.CDI,
-        from: new Date('2026-06-01T00:00:00'),
         observations: toObservations(CDI_JUNE_2026),
         to: new Date('2026-06-30T00:00:00')
       });
@@ -132,7 +129,6 @@ describe('SgsIndexBuilderService', () => {
       const points = builder.buildDailyIndex({
         observations,
         config: SGS_SERIES.CDI,
-        from: startDate,
         to: addDays(startDate, 7559)
       });
 
@@ -147,11 +143,9 @@ describe('SgsIndexBuilderService', () => {
     });
 
     it('reproduces the full series exactly when rebuilt incrementally from a persisted anchor', () => {
-      const from = new Date('2026-06-01T00:00:00');
       const to = new Date('2026-06-30T00:00:00');
 
       const fullSeries = builder.buildDailyIndex({
-        from,
         to,
         config: SGS_SERIES.CDI,
         observations: toObservations(CDI_JUNE_2026)
@@ -170,7 +164,6 @@ describe('SgsIndexBuilderService', () => {
         anchor,
         to,
         config: SGS_SERIES.CDI,
-        from: new Date('2026-06-18T00:00:00'),
         observations: toObservations(
           CDI_JUNE_2026.filter(([date]) => date >= '2026-06-18')
         )
@@ -187,7 +180,6 @@ describe('SgsIndexBuilderService', () => {
       const points = builder.buildDailyIndex({
         anchor: { date: '2026-06-30', value: new Big('101.23456789') },
         config: SGS_SERIES.CDI,
-        from: new Date('2026-07-01T00:00:00'),
         observations: [],
         to: new Date('2026-07-05T00:00:00')
       });
@@ -204,7 +196,6 @@ describe('SgsIndexBuilderService', () => {
     it('handles a single observation by emitting the base and carrying it', () => {
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.CDI,
-        from: new Date('2026-06-01T00:00:00'),
         observations: toObservations([['2026-06-01', '0.053400']]),
         to: new Date('2026-06-03T00:00:00')
       });
@@ -219,7 +210,6 @@ describe('SgsIndexBuilderService', () => {
     it('returns an empty series when there is no anchor and no observation', () => {
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.CDI,
-        from: new Date('2026-06-01T00:00:00'),
         observations: [],
         to: new Date('2026-06-30T00:00:00')
       });
@@ -233,7 +223,6 @@ describe('SgsIndexBuilderService', () => {
       // Real IPCA observations (SGS 433): January and February 2026
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.IPCA,
-        from: new Date('2026-01-01T00:00:00'),
         observations: toObservations([
           ['2026-01-01', '0.33'],
           ['2026-02-01', '0.70']
@@ -260,7 +249,6 @@ describe('SgsIndexBuilderService', () => {
     it('steps on February 29th in leap years', () => {
       const points = builder.buildDailyIndex({
         config: SGS_SERIES.IPCA,
-        from: new Date('2024-01-01T00:00:00'),
         observations: toObservations([
           ['2024-01-01', '0.42'],
           ['2024-02-01', '0.83']
@@ -278,7 +266,6 @@ describe('SgsIndexBuilderService', () => {
       const points = builder.buildDailyIndex({
         anchor: { date: '2026-01-31', value: new Big('100') },
         config: SGS_SERIES.IPCA,
-        from: new Date('2026-02-01T00:00:00'),
         observations: toObservations([
           ['2026-02-01', '0.70'],
           ['2026-03-01', '0.88']
@@ -296,11 +283,34 @@ describe('SgsIndexBuilderService', () => {
       expect(byDate['2026-04-10'].eq(expectedMarch)).toBe(true);
     });
 
+    it('compounds a negative monthly rate as deflation, decreasing the index', () => {
+      // Real-world case: IPCA can post a negative monthly reading
+      // (deflation). The factor 1 + rate/100 must fall below 1 and the
+      // index must decrease accordingly, not clamp at zero or flip sign.
+      const points = builder.buildDailyIndex({
+        config: SGS_SERIES.IPCA,
+        observations: toObservations([
+          ['2026-01-01', '0.33'],
+          ['2026-02-01', '-0.20']
+        ]),
+        to: new Date('2026-03-05T00:00:00')
+      });
+
+      const byDate = toMap(points);
+
+      expect(byDate['2026-01-31'].toFixed(8)).toBe('100.00000000');
+
+      const expectedFebruary = new Big('100').times('0.9980').round(8);
+
+      expect(byDate['2026-02-28'].eq(expectedFebruary)).toBe(true);
+      expect(byDate['2026-02-28'].lt(byDate['2026-01-31'])).toBe(true);
+      expect(byDate['2026-03-05'].eq(expectedFebruary)).toBe(true);
+    });
+
     it('throws an explicit error when a month is missing in the middle of the series', () => {
       expect(() => {
         return builder.buildDailyIndex({
           config: SGS_SERIES.IPCA,
-          from: new Date('2026-01-01T00:00:00'),
           observations: toObservations([
             ['2026-01-01', '0.33'],
             ['2026-03-01', '0.88']

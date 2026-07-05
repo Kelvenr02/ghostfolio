@@ -119,8 +119,7 @@ export class BcbService implements DataProviderInterface {
         anchor,
         observations,
         to,
-        config: seriesConfig,
-        from: lookbackFrom
+        config: seriesConfig
       });
 
       const result: {

@@ -154,6 +154,50 @@ describe('BcbService', () => {
       expect(result.IPCA['2026-06-10'].marketPrice).toBe(expected);
     });
 
+    it('anchors the IPCA index strictly before the 120-day lookback boundary', async () => {
+      findFirstMock.mockResolvedValue(null);
+      fetchObservationsMock.mockResolvedValue([]);
+
+      await bcbService.getHistorical({
+        from: new Date('2026-06-03T00:00:00'),
+        symbol: 'IPCA',
+        to: new Date('2026-06-10T00:00:00')
+      });
+
+      const observationArgs = fetchObservationsMock.mock.calls[0][0];
+      const anchorQuery = findFirstMock.mock.calls[0][0];
+
+      // IPCA lookback is 120 days: 2026-06-03 - 120d = 2026-02-03
+      expect(format(observationArgs.from, 'yyyy-MM-dd')).toBe('2026-02-03');
+      expect(anchorQuery.where.date).toEqual({ lt: toUtcDate('2026-02-03') });
+    });
+
+    it('treats an anchor inside the 120-day IPCA lookback as stale and chains from it anyway', async () => {
+      // Simulates a persisted anchor that falls inside the lookback window
+      // (2026-04-30 is only ~34 days before "from", well inside the 120-day
+      // horizon starting 2026-02-03); the mock bypasses Prisma's own `lt`
+      // filter, so this exercises the builder's tolerance to an anchor
+      // newer than the query would ever return in production, rather than
+      // the query construction itself (covered by the test above).
+      findFirstMock.mockResolvedValue({
+        date: toUtcDate('2026-04-30'),
+        marketPrice: 100
+      });
+      fetchObservationsMock.mockResolvedValue([
+        { date: '2026-05-01', rate: new Big('0.58') }
+      ]);
+
+      const result = await bcbService.getHistorical({
+        from: new Date('2026-06-03T00:00:00'),
+        symbol: 'IPCA',
+        to: new Date('2026-06-10T00:00:00')
+      });
+
+      const expected = new Big('100').times('1.0058').round(8).toNumber();
+
+      expect(result.IPCA['2026-06-10'].marketPrice).toBe(expected);
+    });
+
     it('returns an empty result for a symbol outside the catalog without calling SGS', async () => {
       const result = await bcbService.getHistorical({
         from: new Date('2026-06-01T00:00:00'),
