@@ -46,7 +46,7 @@ Módulo full-stack `contribution-plan`, implementado em `apps/api/src/app/contri
 | `edit-allocation-targets-dialog/edit-allocation-targets-dialog.component.ts/.html/.scss` | Dialog de edição de alvos: `FormArray` de linhas (ativo via `gf-symbol-autocomplete`, percentual, modo de compra, mínimo de compra), validação client de soma = 100%, chama `putAllocationTargets`.                                                                                                               |
 | `edit-allocation-targets-dialog/interfaces/interfaces.ts`                                | `EditAllocationTargetsDialogParams`.                                                                                                                                                                                                                                                                              |
 
-A aba "Planejador de aporte" no Portfolio é **condicional** (`showCondition: user?.settings?.isExperimentalFeatures`) — diferença deliberada em relação ao Módulo 02 (Calculadora de IR), que é always-visible. Registrada em `portfolio-page.component.ts`/`portfolio-page.routes.ts`.
+A aba "Planejador de aporte" no Portfolio é **condicional** (`showCondition: user?.settings?.isExperimentalFeatures`). A aba "Calculadora de IR" (Módulo 02) inicialmente era always-visible por decisão deliberada, mas foi padronizada com a mesma condição após auditoria (2026-07-05) apontar a inconsistência de UX entre os dois módulos experimentais. Registrada em `portfolio-page.component.ts`/`portfolio-page.routes.ts`.
 
 ### Tipos compartilhados (`libs/common`)
 

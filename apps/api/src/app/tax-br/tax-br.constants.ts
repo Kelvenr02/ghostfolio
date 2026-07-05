@@ -30,6 +30,20 @@ export const EQUITY_TAX_RATE_PERCENT: Record<
   FII: 20
 };
 
+// Regra 2 da tabela de auditoria (02-calculadora-ir-br.md, confianca Alta,
+// gov.br/receitafederal "Isencoes"): day-trade nunca usufrui da isencao
+// mensal de R$20.000,00 (essa isencao vale so para operacoes comuns) e o
+// ganho liquido e sempre tributado a 20%, independente do valor vendido ou
+// da classe fiscal do ativo.
+export const DAY_TRADE_TAX_RATE_PERCENT = 20;
+
+export const DAY_TRADE_CLASSIFICATION_ASSUMPTION =
+  'Uma venda e classificada como day-trade quando ha compra e venda do ' +
+  'mesmo ativo no mesmo dia (mesmo criterio do aviso SAME_DAY_ACTIVITY); ' +
+  'o valor INTEIRO da venda nesse dia e tratado como day-trade, sem casar ' +
+  'lotes especificos comprados/vendidos no dia -- simplificacao registrada, ' +
+  'nao verificavel com os dados do Ghostfolio.';
+
 export const DARF_CODE = '6015';
 
 // Lei 8.668/1993: rendimento mensal de FII e isento para PF somente se (i) as

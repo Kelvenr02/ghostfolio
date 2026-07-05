@@ -37,6 +37,7 @@ export interface TaxBrSaleDetail {
 export interface TaxBrEquityClassMonthSummary {
   exemptionReason?: string;
   fiscalClass: Exclude<TaxFiscalClass, 'RENDA_FIXA'>;
+  isDayTrade: boolean;
   isExempt: boolean;
   isLossMonth: boolean;
   ratePercent: 15 | 20;

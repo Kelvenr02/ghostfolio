@@ -33,7 +33,10 @@ import {
   ITaxActivity
 } from './interfaces/interfaces';
 import { MonthlyTaxAggregatorService } from './monthly-tax-aggregator.service';
-import { FII_INCOME_EXEMPTION_ASSUMPTION } from './tax-br.constants';
+import {
+  DAY_TRADE_CLASSIFICATION_ASSUMPTION,
+  FII_INCOME_EXEMPTION_ASSUMPTION
+} from './tax-br.constants';
 import {
   getFixedIncomeRateBracket,
   roundToCents,
@@ -113,7 +116,8 @@ export class TaxBrReportService {
       assumptions: [
         FII_INCOME_EXEMPTION_ASSUMPTION,
         DARF_ESTIMATE_ASSUMPTION,
-        FIXED_INCOME_REDEMPTION_ASSUMPTION
+        FIXED_INCOME_REDEMPTION_ASSUMPTION,
+        DAY_TRADE_CLASSIFICATION_ASSUMPTION
       ],
       baseCurrency: 'BRL',
       classificationWarnings: this.buildClassificationWarnings(
@@ -298,6 +302,7 @@ export class TaxBrReportService {
     ).map((entry) => ({
       exemptionReason: entry.exemptionReason,
       fiscalClass: entry.fiscalClass,
+      isDayTrade: entry.isDayTrade,
       isExempt: entry.isExempt,
       isLossMonth: entry.isLossMonth,
       ratePercent: entry.ratePercent,

@@ -35,8 +35,8 @@ export class EquityTaxCalculatorService {
       })
       .sort((a, b) => a.dateBrt.localeCompare(b.dateBrt));
 
-    const dataWarnings: IEquityDataWarning[] =
-      this.detectSameDayWarnings(equityActivities);
+    const { dataWarnings, dayTradeKeys } =
+      this.detectSameDayActivity(equityActivities);
 
     const symbolStates = new Map<string, IEquitySymbolState>();
     const realizedEvents: IEquityRealizedEvent[] = [];
@@ -115,6 +115,9 @@ export class EquityTaxCalculatorService {
           dateBrt: activity.dateBrt,
           feeBrl: activity.feeBrl,
           grossSaleValueBrl: activity.grossValueBrl,
+          isDayTrade: dayTradeKeys.has(
+            `${assetProfileIdentifier}|${activity.dateBrt}`
+          ),
           quantitySold: activity.quantity,
           symbol: activity.symbol,
           yearMonth: activity.yearMonth
@@ -125,9 +128,10 @@ export class EquityTaxCalculatorService {
     return { dataWarnings, realizedEvents, symbolStates };
   }
 
-  private detectSameDayWarnings(
-    activities: ITaxActivity[]
-  ): IEquityDataWarning[] {
+  private detectSameDayActivity(activities: ITaxActivity[]): {
+    dataWarnings: IEquityDataWarning[];
+    dayTradeKeys: Set<string>;
+  } {
     const typesBySymbolAndDate = new Map<
       string,
       {
@@ -154,20 +158,22 @@ export class EquityTaxCalculatorService {
       typesBySymbolAndDate.set(key, entry);
     }
 
-    const warnings: IEquityDataWarning[] = [];
+    const dataWarnings: IEquityDataWarning[] = [];
+    const dayTradeKeys = new Set<string>();
 
-    for (const entry of typesBySymbolAndDate.values()) {
+    for (const [key, entry] of typesBySymbolAndDate) {
       if (entry.types.has('BUY') && entry.types.has('SELL')) {
-        warnings.push({
+        dataWarnings.push({
           assetProfileIdentifier: entry.assetProfileIdentifier,
           dataSource: entry.dataSource,
           dateBrt: entry.dateBrt,
           reason: 'SAME_DAY_ACTIVITY',
           symbol: entry.symbol
         });
+        dayTradeKeys.add(key);
       }
     }
 
-    return warnings;
+    return { dataWarnings, dayTradeKeys };
   }
 }

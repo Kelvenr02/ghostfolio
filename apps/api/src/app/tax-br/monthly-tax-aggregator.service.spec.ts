@@ -15,6 +15,7 @@ function buildEvent(
     feeBrl: new Big(0),
     fiscalClass: 'ACAO',
     grossSaleValueBrl: new Big(0),
+    isDayTrade: false,
     quantitySold: new Big(1),
     realizedGainBrl: new Big(0),
     symbol: 'PETR4.SA',
@@ -86,6 +87,59 @@ describe('MonthlyTaxAggregatorService', () => {
 
     expect(acao.isExempt).toBe(false);
     expect(acao.taxDueBrl.toString()).toBe('750');
+  });
+
+  it('taxes a day-trade stock sale at 20 percent and ignores the R$20,000 exemption even below the threshold', () => {
+    const events = [
+      buildEvent({
+        isDayTrade: true,
+        grossSaleValueBrl: new Big(5000),
+        realizedGainBrl: new Big(1000)
+      })
+    ];
+
+    const acao = service
+      .aggregate(events)
+      .get('2026-07')
+      .equity.find((entry) => entry.fiscalClass === 'ACAO');
+
+    expect(acao.isDayTrade).toBe(true);
+    expect(acao.isExempt).toBe(false);
+    expect(acao.exemptionReason).toBeUndefined();
+    expect(acao.ratePercent).toBe(20);
+    expect(acao.taxDueBrl.toString()).toBe('200');
+  });
+
+  it('keeps day-trade and swing-trade stock sales in the same month as separate, independently-taxed aggregates', () => {
+    const events = [
+      buildEvent({
+        isDayTrade: true,
+        grossSaleValueBrl: new Big(5000),
+        realizedGainBrl: new Big(1000) // day-trade: 20% = 200
+      }),
+      buildEvent({
+        isDayTrade: false,
+        grossSaleValueBrl: new Big(8000),
+        realizedGainBrl: new Big(500) // swing-trade: alone below R$20k -> exempt
+      })
+    ];
+
+    const { equity, darf } = service.aggregate(events).get('2026-07');
+    const acaoEntries = equity.filter((entry) => entry.fiscalClass === 'ACAO');
+
+    expect(acaoEntries).toHaveLength(2);
+
+    const dayTrade = acaoEntries.find((entry) => entry.isDayTrade);
+    const swingTrade = acaoEntries.find((entry) => !entry.isDayTrade);
+
+    // The day-trade sale does not count toward the swing-trade R$20,000
+    // exemption total, and vice-versa.
+    expect(dayTrade.totalGrossSalesBrl.toString()).toBe('5000');
+    expect(dayTrade.taxDueBrl.toString()).toBe('200');
+    expect(swingTrade.totalGrossSalesBrl.toString()).toBe('8000');
+    expect(swingTrade.isExempt).toBe(true);
+    expect(swingTrade.taxDueBrl.toString()).toBe('0');
+    expect(darf.totalTaxDueBrl.toString()).toBe('200');
   });
 
   it('never exempts ETF gains regardless of monthly sale value', () => {

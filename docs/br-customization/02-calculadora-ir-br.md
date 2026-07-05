@@ -18,6 +18,7 @@ Evidência TDD completa (RED→GREEN por arquivo, cobertura, gates): `docs/testi
 
 ## Decisões de escopo v1
 
+- **Day-trade (regra 2) implementado com uma simplificação registrada**: uma venda é classificada como day-trade quando há compra E venda do mesmo ativo no mesmo dia BRT (mesmo critério já usado pelo aviso `SAME_DAY_ACTIVITY`); o valor INTEIRO da venda nesse dia é tratado como day-trade — não há apuração de lotes específicos comprados/vendidos no dia. Day-trade nunca recebe a isenção de R$20.000/mês e é sempre tributado a 20%, separado das vendas comuns (swing-trade) do mesmo mês/classe fiscal, que continuam com sua própria apuração de isenção. Auditado e corrigido em 2026-07-05 (o motor anteriormente ignorava a segregação).
 - **Sem compensação de prejuízo entre meses, e sem netting entre classes fiscais no mesmo mês** (regra 5 acima não totalmente confirmada em fonte primária).
 - **IOF fora de escopo** (usuário buy & hold, resgates antecipados de RF raros; adicionar depois é aditivo).
 - **JCP (juros sobre capital próprio)** não tem tratamento dedicado — lacuna conhecida.

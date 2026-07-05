@@ -5,6 +5,7 @@ import { Big } from 'big.js';
 
 import { IEquityRealizedEvent } from './interfaces/interfaces';
 import {
+  DAY_TRADE_TAX_RATE_PERCENT,
   EQUITY_TAX_RATE_PERCENT,
   STOCK_MONTHLY_EXEMPTION_THRESHOLD_BRL
 } from './tax-br.constants';
@@ -13,6 +14,7 @@ import { lastWeekdayOfMonth } from './tax-br.helper';
 export interface IEquityClassMonthAggregate {
   exemptionReason?: string;
   fiscalClass: Exclude<TaxFiscalClass, 'RENDA_FIXA'>;
+  isDayTrade: boolean;
   isExempt: boolean;
   isLossMonth: boolean;
   ratePercent: 15 | 20;
@@ -92,44 +94,85 @@ export class MonthlyTaxAggregatorService {
     const aggregates: IEquityClassMonthAggregate[] = [];
 
     for (const [fiscalClass, classEvents] of eventsByClass) {
-      const totalGrossSalesBrl = classEvents.reduce(
-        (total, event) => total.plus(event.grossSaleValueBrl),
-        new Big(0)
-      );
-      const totalRealizedGainBrl = classEvents.reduce(
-        (total, event) => total.plus(event.realizedGainBrl),
-        new Big(0)
-      );
+      // Day-trade is aggregated separately from swing-trade (regular)
+      // sales: it never gets the R$20,000 monthly exemption and it is
+      // always taxed at 20%, regardless of fiscal class or amount sold.
+      const dayTradeEvents = classEvents.filter((event) => event.isDayTrade);
+      const swingTradeEvents = classEvents.filter((event) => !event.isDayTrade);
 
-      const isExempt =
-        fiscalClass === 'ACAO' &&
-        totalGrossSalesBrl.lte(STOCK_MONTHLY_EXEMPTION_THRESHOLD_BRL);
-      const isLossMonth = totalRealizedGainBrl.lt(0);
-      const taxableGainBrl = isExempt
-        ? new Big(0)
-        : totalRealizedGainBrl.gt(0)
-          ? totalRealizedGainBrl
-          : new Big(0);
-      const ratePercent = EQUITY_TAX_RATE_PERCENT[fiscalClass];
-      const taxDueBrl = taxableGainBrl.mul(ratePercent).div(100);
+      if (swingTradeEvents.length > 0) {
+        aggregates.push(
+          this.buildClassAggregate({
+            fiscalClass,
+            events: swingTradeEvents,
+            isDayTrade: false,
+            ratePercent: EQUITY_TAX_RATE_PERCENT[fiscalClass]
+          })
+        );
+      }
 
-      aggregates.push({
-        fiscalClass,
-        isExempt,
-        isLossMonth,
-        ratePercent,
-        taxableGainBrl,
-        taxDueBrl,
-        totalGrossSalesBrl,
-        totalRealizedGainBrl,
-        exemptionReason: isExempt
-          ? 'Soma das vendas de ações no mês igual ou abaixo de R$20.000,00 (Lei 9.250/1995).'
-          : undefined,
-        sales: classEvents
-      });
+      if (dayTradeEvents.length > 0) {
+        aggregates.push(
+          this.buildClassAggregate({
+            fiscalClass,
+            events: dayTradeEvents,
+            isDayTrade: true,
+            ratePercent: DAY_TRADE_TAX_RATE_PERCENT
+          })
+        );
+      }
     }
 
     return aggregates;
+  }
+
+  private buildClassAggregate({
+    events,
+    fiscalClass,
+    isDayTrade,
+    ratePercent
+  }: {
+    events: IEquityRealizedEvent[];
+    fiscalClass: Exclude<TaxFiscalClass, 'RENDA_FIXA'>;
+    isDayTrade: boolean;
+    ratePercent: 15 | 20;
+  }): IEquityClassMonthAggregate {
+    const totalGrossSalesBrl = events.reduce(
+      (total, event) => total.plus(event.grossSaleValueBrl),
+      new Big(0)
+    );
+    const totalRealizedGainBrl = events.reduce(
+      (total, event) => total.plus(event.realizedGainBrl),
+      new Big(0)
+    );
+
+    const isExempt =
+      !isDayTrade &&
+      fiscalClass === 'ACAO' &&
+      totalGrossSalesBrl.lte(STOCK_MONTHLY_EXEMPTION_THRESHOLD_BRL);
+    const isLossMonth = totalRealizedGainBrl.lt(0);
+    const taxableGainBrl = isExempt
+      ? new Big(0)
+      : totalRealizedGainBrl.gt(0)
+        ? totalRealizedGainBrl
+        : new Big(0);
+    const taxDueBrl = taxableGainBrl.mul(ratePercent).div(100);
+
+    return {
+      fiscalClass,
+      isDayTrade,
+      isExempt,
+      isLossMonth,
+      ratePercent,
+      taxableGainBrl,
+      taxDueBrl,
+      totalGrossSalesBrl,
+      totalRealizedGainBrl,
+      exemptionReason: isExempt
+        ? 'Soma das vendas de ações no mês igual ou abaixo de R$20.000,00 (Lei 9.250/1995).'
+        : undefined,
+      sales: events
+    };
   }
 
   private getDarfDueDate(yearMonth: string): string {

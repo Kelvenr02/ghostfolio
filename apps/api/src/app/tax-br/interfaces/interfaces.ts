@@ -33,6 +33,7 @@ export interface IEquityRealizedEvent {
   feeBrl: Big;
   fiscalClass: Exclude<TaxFiscalClass, 'RENDA_FIXA'>;
   grossSaleValueBrl: Big;
+  isDayTrade: boolean;
   quantitySold: Big;
   realizedGainBrl: Big;
   symbol: string;

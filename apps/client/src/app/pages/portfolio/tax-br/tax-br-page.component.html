@@ -137,9 +137,15 @@
                 </tr>
               </thead>
               <tbody>
-                @for (entry of month.equity; track entry.fiscalClass) {
+                @for (
+                  entry of month.equity;
+                  track entry.fiscalClass + (entry.isDayTrade ? '-dt' : '-st')
+                ) {
                   <tr>
-                    <td>{{ entry.fiscalClass }}</td>
+                    <td>
+                      {{ entry.fiscalClass
+                      }}{{ entry.isDayTrade ? ' (day-trade)' : '' }}
+                    </td>
                     <td class="text-right">
                       {{ entry.totalGrossSalesBrl | currency: 'BRL' }}
                     </td>

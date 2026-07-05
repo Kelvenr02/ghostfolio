@@ -77,7 +77,8 @@ export class PortfolioPageComponent {
             {
               iconName: 'receipt-outline',
               label: internalRoutes.portfolio.subRoutes.taxBr.title,
-              routerLink: internalRoutes.portfolio.subRoutes.taxBr.routerLink
+              routerLink: internalRoutes.portfolio.subRoutes.taxBr.routerLink,
+              showCondition: !!state.user?.settings?.isExperimentalFeatures
             }
           ];
           this.user = state.user;

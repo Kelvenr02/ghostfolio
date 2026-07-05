@@ -297,7 +297,7 @@ describe('EquityTaxCalculatorService', () => {
       })
     ];
 
-    const { dataWarnings } = service.compute(
+    const { dataWarnings, realizedEvents } = service.compute(
       activities,
       buildClassifications('YAHOO-BOVA11.SA')
     );
@@ -311,6 +311,34 @@ describe('EquityTaxCalculatorService', () => {
         symbol: 'BOVA11.SA'
       }
     ]);
+    expect(realizedEvents[0].isDayTrade).toBe(true);
+  });
+
+  it('does not flag a sell as day-trade when the buy of the same symbol happened on a different day', () => {
+    const activities = [
+      buildActivity({
+        id: 'buy-1',
+        dateBrt: '2026-07-01',
+        grossValueBrl: new Big(1000),
+        quantity: new Big(10),
+        type: ActivityType.BUY
+      }),
+      buildActivity({
+        id: 'sell-1',
+        dateBrt: '2026-07-10',
+        grossValueBrl: new Big(600),
+        quantity: new Big(5),
+        type: ActivityType.SELL
+      })
+    ];
+
+    const { dataWarnings, realizedEvents } = service.compute(
+      activities,
+      buildClassifications('YAHOO-BOVA11.SA')
+    );
+
+    expect(dataWarnings).toEqual([]);
+    expect(realizedEvents[0].isDayTrade).toBe(false);
   });
 
   it('flags a warning and treats cost as zero when a sell has no prior purchase history for that symbol', () => {
