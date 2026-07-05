@@ -115,6 +115,9 @@ describe('BcbService', () => {
 
       expect(anchorQuery.where.symbol).toBe('CDI');
       expect(anchorQuery.where.dataSource).toBe(DataSource.BCB);
+      // Anchor must be strictly older than the lookback window
+      // (from 2026-06-18 minus the 15-day CDI lookback = 2026-06-03)
+      expect(anchorQuery.where.date).toEqual({ lt: toUtcDate('2026-06-03') });
       expect(anchorQuery.orderBy).toEqual({ date: 'desc' });
     });
 
