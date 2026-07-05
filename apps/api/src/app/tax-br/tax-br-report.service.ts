@@ -34,7 +34,11 @@ import {
 } from './interfaces/interfaces';
 import { MonthlyTaxAggregatorService } from './monthly-tax-aggregator.service';
 import { FII_INCOME_EXEMPTION_ASSUMPTION } from './tax-br.constants';
-import { roundToCents, toBrtCalendarDate } from './tax-br.helper';
+import {
+  getFixedIncomeRateBracket,
+  roundToCents,
+  toBrtCalendarDate
+} from './tax-br.helper';
 import { resolveSymbolClassifications } from './tax-classification.helper';
 
 const DARF_ESTIMATE_ASSUMPTION =
@@ -237,14 +241,7 @@ export class TaxBrReportService {
           (24 * 60 * 60 * 1000)
       );
 
-      const ratePercent: 22.5 | 20 | 17.5 | 15 =
-        daysHeldAsOfToday <= 180
-          ? 22.5
-          : daysHeldAsOfToday <= 360
-            ? 20
-            : daysHeldAsOfToday <= 720
-              ? 17.5
-              : 15;
+      const { ratePercent } = getFixedIncomeRateBracket(daysHeldAsOfToday);
 
       return {
         daysHeldAsOfToday,
