@@ -7,8 +7,10 @@ import { validateObjectForForm } from '@ghostfolio/common/utils';
 import { DataService } from '@ghostfolio/ui/services';
 import { GfSymbolAutocompleteComponent } from '@ghostfolio/ui/symbol-autocomplete';
 
+import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
+  CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
@@ -54,9 +56,11 @@ const TARGET_PERCENTAGE_SUM_IN_CENTS = 10_000;
     MatIconModule,
     MatInputModule,
     MatSelectModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    DecimalPipe
   ],
   selector: 'gf-edit-allocation-targets-dialog',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   styleUrls: ['./edit-allocation-targets-dialog.scss'],
   templateUrl: 'edit-allocation-targets-dialog.html'
 })
