@@ -1,6 +1,7 @@
 import { DataSource, PurchaseMode } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
   IsEnum,
@@ -9,6 +10,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested
 } from 'class-validator';
@@ -27,6 +29,7 @@ export class AllocationTargetItemDto {
 
   @IsNotEmpty()
   @IsString()
+  @MaxLength(64)
   symbol: string;
 
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -36,6 +39,7 @@ export class AllocationTargetItemDto {
 }
 
 export class UpdateAllocationTargetsDto {
+  @ArrayMaxSize(100)
   @ArrayNotEmpty()
   @IsArray()
   @Type(() => AllocationTargetItemDto)
