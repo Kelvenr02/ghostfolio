@@ -1,0 +1,34 @@
+{
+  "explains": [],
+  "count": 1,
+  "quotes": [
+    {
+      "exchange": "SAO",
+      "shortname": "ISHARES BOVACI",
+      "quoteType": "EQUITY",
+      "symbol": "BOVA11.SA",
+      "index": "quotes",
+      "score": 20004,
+      "typeDisp": "Equity",
+      "longname": "ISHARES IBOVESPA CLASSE DE ÍNDICE - RESPONSABILIDADE LIMITADA",
+      "exchDisp": "São Paulo",
+      "isYahooFinance": true
+    }
+  ],
+  "news": [],
+  "nav": [],
+  "lists": [],
+  "researchReports": [],
+  "screenerFieldResults": [],
+  "totalTime": 34,
+  "timeTakenForQuotes": 413,
+  "timeTakenForNews": 600,
+  "timeTakenForAlgowatchlist": 400,
+  "timeTakenForPredefinedScreener": 400,
+  "timeTakenForCrunchbase": 400,
+  "timeTakenForNav": 400,
+  "timeTakenForResearchReports": 0,
+  "timeTakenForScreenerField": 0,
+  "timeTakenForCulturalAssets": 0,
+  "timeTakenForSearchLists": 0
+}
