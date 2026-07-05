@@ -47,3 +47,7 @@ testem.log
 # System Files
 .DS_Store
 Thumbs.db
+
+# Local dev SSL certs (self-signed, generated per DEVELOPMENT.md)
+apps/client/localhost.cert
+apps/client/localhost.pem
