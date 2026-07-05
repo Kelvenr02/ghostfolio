@@ -18,5 +18,7 @@ export default {
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/api',
   testEnvironment: 'node',
+  // Smoke tests live (validação B3/BRL) só rodam via `nx run api:test-live`
+  testPathIgnorePatterns: ['/node_modules/', '\\.live-spec\\.ts$'],
   preset: '../../jest.preset.js'
 };
