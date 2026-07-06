@@ -3,6 +3,7 @@ import { getAssetProfileIdentifier } from '@ghostfolio/common/helper';
 import { DataSource, PurchaseMode } from '@prisma/client';
 import { Big } from 'big.js';
 
+import { DRIFT_THRESHOLD_PERCENT } from './contribution-plan-drift.constants';
 import { ContributionPlanService } from './contribution-plan.service';
 
 function buildAllocationTargetItemDto(overrides: Record<string, unknown> = {}) {
@@ -39,6 +40,7 @@ function buildTarget(overrides: Record<string, unknown> = {}) {
 
 function buildHolding(overrides: Record<string, unknown> = {}) {
   return {
+    allocationInPercentage: 0,
     assetProfile: {
       currency: 'BRL',
       dataSource: DataSource.YAHOO,
@@ -700,6 +702,127 @@ describe('ContributionPlanService', () => {
           update: {}
         })
       );
+    });
+  });
+
+  describe('getAllocationDrift', () => {
+    it('returns an empty, non-drifted snapshot when the user has no allocation targets configured', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([]);
+
+      const response = await service.getAllocationDrift({
+        impersonationId: undefined,
+        userId: 'user-1'
+      });
+
+      expect(portfolioServiceMock.getDetails).not.toHaveBeenCalled();
+      expect(response).toEqual({
+        asOf: expect.any(String),
+        driftThresholdPercent: DRIFT_THRESHOLD_PERCENT,
+        isDrifted: false,
+        items: []
+      });
+    });
+
+    it('passes impersonationId/userId through to portfolioService.getDetails, mirroring createPlan', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({ targetPercentage: 100 })
+      ]);
+      portfolioServiceMock.getDetails.mockResolvedValue({
+        holdings: { 'BOVA11.SA': buildHolding({ allocationInPercentage: 1 }) }
+      });
+
+      await service.getAllocationDrift({
+        impersonationId: 'impersonation-1',
+        userId: 'user-1'
+      });
+
+      expect(portfolioServiceMock.getDetails).toHaveBeenCalledWith({
+        impersonationId: 'impersonation-1',
+        userId: 'user-1'
+      });
+    });
+
+    it('computes currentPercentage from the holding allocationInPercentage fraction and deviationInPercentage against the target, staying isDrifted=false within the threshold', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({ targetPercentage: 60 })
+      ]);
+      portfolioServiceMock.getDetails.mockResolvedValue({
+        holdings: {
+          'BOVA11.SA': buildHolding({ allocationInPercentage: 0.58 })
+        }
+      });
+
+      const response = await service.getAllocationDrift({
+        impersonationId: undefined,
+        userId: 'user-1'
+      });
+
+      expect(response.isDrifted).toBe(false);
+      expect(response.items).toEqual([
+        {
+          currentPercentage: 58,
+          deviationInPercentage: -2,
+          name: 'BOVA11',
+          symbol: 'BOVA11.SA',
+          targetPercentage: 60
+        }
+      ]);
+    });
+
+    it('flags isDrifted=true when an asset overshoots its target beyond DRIFT_THRESHOLD_PERCENT', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({ targetPercentage: 60 })
+      ]);
+      portfolioServiceMock.getDetails.mockResolvedValue({
+        holdings: {
+          'BOVA11.SA': buildHolding({ allocationInPercentage: 0.7 })
+        }
+      });
+
+      const response = await service.getAllocationDrift({
+        impersonationId: undefined,
+        userId: 'user-1'
+      });
+
+      expect(response.isDrifted).toBe(true);
+      expect(response.items[0]).toMatchObject({ deviationInPercentage: 10 });
+    });
+
+    it('flags isDrifted=true when an asset undershoots its target beyond DRIFT_THRESHOLD_PERCENT (negative deviation)', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({ targetPercentage: 60 })
+      ]);
+      portfolioServiceMock.getDetails.mockResolvedValue({
+        holdings: {
+          'BOVA11.SA': buildHolding({ allocationInPercentage: 0.4 })
+        }
+      });
+
+      const response = await service.getAllocationDrift({
+        impersonationId: undefined,
+        userId: 'user-1'
+      });
+
+      expect(response.isDrifted).toBe(true);
+      expect(response.items[0]).toMatchObject({ deviationInPercentage: -20 });
+    });
+
+    it('reports currentPercentage=0 for a target with no matching holding yet (never bought)', async () => {
+      prismaServiceMock.allocationTarget.findMany.mockResolvedValue([
+        buildTarget({ targetPercentage: 40 })
+      ]);
+      portfolioServiceMock.getDetails.mockResolvedValue({ holdings: {} });
+
+      const response = await service.getAllocationDrift({
+        impersonationId: undefined,
+        userId: 'user-1'
+      });
+
+      expect(response.items[0]).toMatchObject({
+        currentPercentage: 0,
+        deviationInPercentage: -40
+      });
+      expect(response.isDrifted).toBe(true);
     });
   });
 });
