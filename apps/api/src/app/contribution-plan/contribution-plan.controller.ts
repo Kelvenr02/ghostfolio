@@ -7,6 +7,7 @@ import {
   AllocationTargetsResponse,
   ContributionPlanResponse
 } from '@ghostfolio/common/interfaces';
+import { AllocationDriftResponse } from '@ghostfolio/common/interfaces/responses/allocation-drift-response.interface';
 import { permissions } from '@ghostfolio/common/permissions';
 import type { RequestWithUser } from '@ghostfolio/common/types';
 
@@ -46,6 +47,21 @@ export class ContributionPlanController {
 
     return this.contributionPlanService.createPlan({
       amount,
+      impersonationId,
+      userId: impersonationUserId || this.request.user.id
+    });
+  }
+
+  @Get('drift')
+  @HasPermission(permissions.accessContributionPlan)
+  @UseGuards(AuthGuard('jwt'), HasPermissionGuard)
+  public async getAllocationDrift(
+    @Headers(HEADER_KEY_IMPERSONATION.toLowerCase()) impersonationId: string
+  ): Promise<AllocationDriftResponse> {
+    const impersonationUserId =
+      await this.impersonationService.validateImpersonationId(impersonationId);
+
+    return this.contributionPlanService.getAllocationDrift({
       impersonationId,
       userId: impersonationUserId || this.request.user.id
     });
