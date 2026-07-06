@@ -27,6 +27,7 @@ import {
   ActivitiesResponse,
   ActivityResponse,
   AiPromptResponse,
+  AllocationDriftResponse,
   AllocationTargetsResponse,
   ApiKeyResponse,
   AssetProfileIdentifier,
@@ -759,6 +760,12 @@ export class DataService {
   public fetchAllocationTargets() {
     return this.http.get<AllocationTargetsResponse>(
       '/api/v1/contribution-plan/targets'
+    );
+  }
+
+  public fetchAllocationDrift() {
+    return this.http.get<AllocationDriftResponse>(
+      '/api/v1/contribution-plan/drift'
     );
   }
 

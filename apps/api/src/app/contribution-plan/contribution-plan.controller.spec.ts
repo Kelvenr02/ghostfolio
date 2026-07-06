@@ -8,6 +8,7 @@ import { ContributionPlanController } from './contribution-plan.controller';
 describe('ContributionPlanController', () => {
   let contributionPlanServiceMock: {
     createPlan: jest.Mock;
+    getAllocationDrift: jest.Mock;
     getTargets: jest.Mock;
     replaceTargets: jest.Mock;
   };
@@ -18,6 +19,12 @@ describe('ContributionPlanController', () => {
   beforeEach(() => {
     contributionPlanServiceMock = {
       createPlan: jest.fn().mockResolvedValue({}),
+      getAllocationDrift: jest.fn().mockResolvedValue({
+        asOf: '2026-07-06T00:00:00.000Z',
+        driftThresholdPercent: 5,
+        isDrifted: false,
+        items: []
+      }),
       getTargets: jest.fn().mockResolvedValue({ targets: [] }),
       replaceTargets: jest.fn().mockResolvedValue({ targets: [] })
     };
@@ -85,6 +92,44 @@ describe('ContributionPlanController', () => {
       impersonationId: undefined,
       userId: 'user-1'
     });
+  });
+
+  it('requires the accessContributionPlan permission on GET /contribution-plan/drift', () => {
+    const requiredPermission = Reflect.getMetadata(
+      HAS_PERMISSION_KEY,
+      ContributionPlanController.prototype.getAllocationDrift
+    );
+
+    expect(requiredPermission).toBe(permissions.accessContributionPlan);
+  });
+
+  it('resolves the impersonated user id and delegates to contributionPlanService.getAllocationDrift', async () => {
+    impersonationServiceMock.validateImpersonationId.mockResolvedValue(
+      'impersonated-user'
+    );
+
+    await controller.getAllocationDrift('impersonation-1');
+
+    expect(
+      impersonationServiceMock.validateImpersonationId
+    ).toHaveBeenCalledWith('impersonation-1');
+    expect(contributionPlanServiceMock.getAllocationDrift).toHaveBeenCalledWith(
+      {
+        impersonationId: 'impersonation-1',
+        userId: 'impersonated-user'
+      }
+    );
+  });
+
+  it('falls back to the signed-in user id when there is no impersonation for GET /drift', async () => {
+    await controller.getAllocationDrift(undefined);
+
+    expect(contributionPlanServiceMock.getAllocationDrift).toHaveBeenCalledWith(
+      {
+        impersonationId: undefined,
+        userId: 'user-1'
+      }
+    );
   });
 
   it('resolves the impersonated user id and delegates to contributionPlanService.getTargets', async () => {

@@ -16,6 +16,7 @@ import {
   DataProviderResponse,
   PortfolioPosition
 } from '@ghostfolio/common/interfaces';
+import { AllocationDriftResponse } from '@ghostfolio/common/interfaces/responses/allocation-drift-response.interface';
 import { AllocationTargetsResponse } from '@ghostfolio/common/interfaces/responses/allocation-targets-response.interface';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { DataSource, Prisma, PurchaseMode } from '@prisma/client';
 import { Big } from 'big.js';
 
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { DRIFT_THRESHOLD_PERCENT } from './contribution-plan-drift.constants';
 import { buildContributionPlan } from './contribution-plan-engine';
 import { roundToCents } from './contribution-plan.helper';
 import { ContributionPlanEngineInput } from './interfaces/interfaces';
@@ -386,6 +388,89 @@ export class ContributionPlanService {
       residualAmount: roundToCents(result.residualAmount).toNumber(),
       totalValueAfter: roundToCents(totalValueAfter).toNumber(),
       totalValueBefore: roundToCents(totalValueBefore).toNumber()
+    };
+  }
+
+  // Objetivo 1 + 2 do diagnóstico BR: expõe alvo % vs. atual % (e o flag de
+  // desbalanceamento) sem depender do fluxo de simulação de aporte. Reaproveita
+  // o mesmo par targets + PortfolioService.getDetails() de resolvePlanAssets,
+  // mas lê `allocationInPercentage` (já calculado pelo PortfolioCalculator
+  // central) em vez de recalcular um terceiro percentual - único motivo de não
+  // chamar serializePlanResponse aqui, que soma apenas os ativos-alvo, e não a
+  // carteira inteira.
+  public async getAllocationDrift({
+    impersonationId,
+    userId
+  }: {
+    impersonationId: string;
+    userId: string;
+  }): Promise<AllocationDriftResponse> {
+    const targets = await this.prismaService.allocationTarget.findMany({
+      include: { symbolProfile: true },
+      where: { userId }
+    });
+
+    if (targets.length === 0) {
+      return {
+        asOf: new Date().toISOString(),
+        driftThresholdPercent: DRIFT_THRESHOLD_PERCENT,
+        isDrifted: false,
+        items: []
+      };
+    }
+
+    const { holdings } = await this.portfolioService.getDetails({
+      impersonationId,
+      userId
+    });
+
+    const holdingsByIdentifier = new Map<string, PortfolioPosition>();
+
+    for (const holding of Object.values(holdings)) {
+      holdingsByIdentifier.set(
+        getAssetProfileIdentifier({
+          dataSource: holding.assetProfile.dataSource,
+          symbol: holding.assetProfile.symbol
+        }),
+        holding
+      );
+    }
+
+    let isDrifted = false;
+
+    const items = targets.map((target) => {
+      const identifier = getAssetProfileIdentifier({
+        dataSource: target.symbolProfile.dataSource,
+        symbol: target.symbolProfile.symbol
+      });
+      const holding = holdingsByIdentifier.get(identifier);
+
+      const currentPercentage = new Big(holding?.allocationInPercentage ?? 0)
+        .times(100)
+        .round(PERCENT_ROUND_DECIMALS, Big.roundHalfUp);
+      const targetPercentage = new Big(target.targetPercentage);
+      const deviationInPercentage = currentPercentage
+        .minus(targetPercentage)
+        .round(PERCENT_ROUND_DECIMALS, Big.roundHalfUp);
+
+      if (deviationInPercentage.abs().gt(DRIFT_THRESHOLD_PERCENT)) {
+        isDrifted = true;
+      }
+
+      return {
+        currentPercentage: currentPercentage.toNumber(),
+        deviationInPercentage: deviationInPercentage.toNumber(),
+        name: target.symbolProfile.name ?? undefined,
+        symbol: target.symbolProfile.symbol,
+        targetPercentage: targetPercentage.toNumber()
+      };
+    });
+
+    return {
+      isDrifted,
+      items,
+      asOf: new Date().toISOString(),
+      driftThresholdPercent: DRIFT_THRESHOLD_PERCENT
     };
   }
 

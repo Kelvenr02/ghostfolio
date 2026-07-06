@@ -1,1 +1,12 @@
+@if (user?.settings?.isExperimentalFeatures && drift?.isDrifted) {
+  <div class="alert alert-warning mb-3" role="alert">
+    <strong i18n
+      >Sua carteira está desbalanceada (desvio acima de
+      {{ drift.driftThresholdPercent }}%) em relação aos alvos
+      configurados.</strong
+    >
+    <a i18n [routerLink]="contributionPlanRouterLink">Revisar alocação</a>
+  </div>
+}
+
 <gf-page-tabs [tabs]="tabs" />

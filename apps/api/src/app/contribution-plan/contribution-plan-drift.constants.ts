@@ -1,0 +1,1 @@
+export const DRIFT_THRESHOLD_PERCENT = 5;

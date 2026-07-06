@@ -1,13 +1,17 @@
 import { UserService } from '@ghostfolio/client/services/user/user.service';
 import { User } from '@ghostfolio/common/interfaces';
+import { AllocationDriftResponse } from '@ghostfolio/common/interfaces/responses/allocation-drift-response.interface';
 import { internalRoutes } from '@ghostfolio/common/routes/routes';
 import {
   GfPageTabsComponent,
   TabConfiguration
 } from '@ghostfolio/ui/page-tabs';
+import { DataService } from '@ghostfolio/ui/services';
 
+import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { addIcons } from 'ionicons';
 import {
   analyticsOutline,
@@ -21,17 +25,21 @@ import {
 
 @Component({
   host: { class: 'page' },
-  imports: [GfPageTabsComponent],
+  imports: [CommonModule, GfPageTabsComponent, RouterLink],
   selector: 'gf-portfolio-page',
   styleUrls: ['./portfolio-page.scss'],
   templateUrl: './portfolio-page.html'
 })
 export class PortfolioPageComponent {
+  public contributionPlanRouterLink =
+    internalRoutes.portfolio.subRoutes.contributionPlan.routerLink;
+  public drift: AllocationDriftResponse;
   public tabs: TabConfiguration[] = [];
   public user: User;
 
   public constructor(
     private changeDetectorRef: ChangeDetectorRef,
+    private dataService: DataService,
     private destroyRef: DestroyRef,
     private userService: UserService
   ) {
@@ -39,6 +47,10 @@ export class PortfolioPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((state) => {
         if (state?.user) {
+          if (state.user.settings?.isExperimentalFeatures && !this.drift) {
+            this.loadAllocationDrift();
+          }
+
           this.tabs = [
             {
               iconName: 'analytics-outline',
@@ -96,5 +108,22 @@ export class PortfolioPageComponent {
       scanOutline,
       swapVerticalOutline
     });
+  }
+
+  private loadAllocationDrift() {
+    this.dataService
+      .fetchAllocationDrift()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        // Best-effort banner: a failure here must never block the portfolio
+        // shell itself from rendering, so it is intentionally silent beyond
+        // simply not showing the banner.
+        error: () => undefined,
+        next: (drift) => {
+          this.drift = drift;
+
+          this.changeDetectorRef.markForCheck();
+        }
+      });
   }
 }

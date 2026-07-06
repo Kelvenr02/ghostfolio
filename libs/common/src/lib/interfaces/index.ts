@@ -49,6 +49,10 @@ import type { AdminUserResponse } from './responses/admin-user-response.interfac
 import type { AdminUsersResponse } from './responses/admin-users-response.interface';
 import type { AiPromptResponse } from './responses/ai-prompt-response.interface';
 import type { AiServiceHealthResponse } from './responses/ai-service-health-response.interface';
+import type {
+  AllocationDriftItem,
+  AllocationDriftResponse
+} from './responses/allocation-drift-response.interface';
 import type { AllocationTargetsResponse } from './responses/allocation-targets-response.interface';
 import type { ApiKeyResponse } from './responses/api-key-response.interface';
 import type { AssetProfileResponse } from './responses/asset-profile-response.interface';
@@ -143,6 +147,8 @@ export {
   AdminUsersResponse,
   AiPromptResponse,
   AiServiceHealthResponse,
+  AllocationDriftItem,
+  AllocationDriftResponse,
   AllocationTarget,
   AllocationTargetsResponse,
   ApiKeyResponse,

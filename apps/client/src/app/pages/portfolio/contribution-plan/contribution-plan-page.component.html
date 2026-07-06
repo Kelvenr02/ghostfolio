@@ -39,6 +39,63 @@
         </button>
       </div>
     } @else {
+      <h2 class="h5" i18n>Alvo % vs. Atual %</h2>
+      @if (isLoadingDrift) {
+        <div class="d-flex justify-content-center py-3">
+          <ngx-skeleton-loader
+            animation="pulse"
+            [theme]="{ height: '2rem', width: '100%' }"
+          />
+        </div>
+      } @else if (driftErrorMessage) {
+        <div class="alert alert-warning" role="alert">
+          {{ driftErrorMessage }}
+        </div>
+      } @else if (drift?.items?.length > 0) {
+        @if (drift.isDrifted) {
+          <div class="alert alert-warning" role="alert">
+            <strong i18n
+              >Carteira desbalanceada (desvio acima de
+              {{ drift.driftThresholdPercent }}%):</strong
+            >
+            <ng-container i18n>
+              revise os ativos destacados abaixo antes do próximo aporte.
+            </ng-container>
+          </div>
+        }
+        <table class="mb-3 table table-sm">
+          <thead>
+            <tr>
+              <th i18n>Ativo</th>
+              <th class="text-right" i18n>Alvo %</th>
+              <th class="text-right" i18n>Atual %</th>
+              <th class="text-right" i18n>Desvio</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of drift.items; track item.symbol) {
+              <tr
+                [class.table-warning]="
+                  item.deviationInPercentage > drift.driftThresholdPercent ||
+                  item.deviationInPercentage < -drift.driftThresholdPercent
+                "
+              >
+                <td>{{ item.name || item.symbol }}</td>
+                <td class="text-right">
+                  {{ item.targetPercentage | number: '1.2-2' }}%
+                </td>
+                <td class="text-right">
+                  {{ item.currentPercentage | number: '1.2-2' }}%
+                </td>
+                <td class="text-right">
+                  {{ item.deviationInPercentage | number: '1.2-2' }}%
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+
       <form
         class="align-items-start d-flex mb-3"
         [formGroup]="contributionForm"
