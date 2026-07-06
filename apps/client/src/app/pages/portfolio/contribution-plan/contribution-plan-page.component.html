@@ -39,7 +39,16 @@
         </button>
       </div>
     } @else {
-      <h2 class="h5" i18n>Alvo % vs. Atual %</h2>
+      <div class="align-items-center d-flex justify-content-between mb-2">
+        <h2 class="h5 mb-0" i18n>Alvo % vs. Atual %</h2>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="openEditAllocationTargetsDialog()"
+        >
+          <ng-container i18n>Editar alvos</ng-container>
+        </button>
+      </div>
       @if (isLoadingDrift) {
         <div class="d-flex justify-content-center py-3">
           <ngx-skeleton-loader
