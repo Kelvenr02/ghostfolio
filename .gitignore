@@ -23,6 +23,9 @@ npm-debug.log
 !.vscode/launch.json
 !.vscode/settings.json
 
+# IDE - OpenCode
+.opencode
+
 # misc
 /.angular/cache
 .claude/settings.local.json
