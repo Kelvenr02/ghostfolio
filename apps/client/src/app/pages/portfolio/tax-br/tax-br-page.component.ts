@@ -3,12 +3,13 @@ import { TaxBrReportResponse } from '@ghostfolio/common/interfaces';
 import { User } from '@ghostfolio/common/interfaces/user.interface';
 import { DataService } from '@ghostfolio/ui/services';
 
+import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgxSkeletonLoaderModule } from 'ngx-skeleton-loader';
 
 @Component({
-  imports: [NgxSkeletonLoaderModule],
+  imports: [CommonModule, NgxSkeletonLoaderModule],
   selector: 'gf-tax-br-page',
   styleUrl: './tax-br-page.component.scss',
   templateUrl: './tax-br-page.component.html'
