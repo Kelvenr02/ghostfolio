@@ -27,6 +27,7 @@ npm-debug.log
 .opencode
 
 # misc
+/docs
 /.angular/cache
 .claude/settings.local.json
 .claude/worktrees
