@@ -3,6 +3,7 @@ import {
   AllocationTargetsResponse,
   ContributionPlanResponse
 } from '@ghostfolio/common/interfaces';
+import { AllocationDriftResponse } from '@ghostfolio/common/interfaces/responses/allocation-drift-response.interface';
 import { User } from '@ghostfolio/common/interfaces/user.interface';
 import { DataService } from '@ghostfolio/ui/services';
 
@@ -40,9 +41,12 @@ import { EditAllocationTargetsDialogParams } from './edit-allocation-targets-dia
 })
 export class GfContributionPlanPageComponent {
   public contributionForm: FormGroup;
+  public drift: AllocationDriftResponse;
+  public driftErrorMessage: string;
   public errorMessage: string;
   public isCalculating = false;
   public isLoading = false;
+  public isLoadingDrift = false;
   public plan: ContributionPlanResponse;
   public targets: AllocationTargetsResponse;
   public user: User;
@@ -71,6 +75,10 @@ export class GfContributionPlanPageComponent {
 
           if (this.user.settings?.isExperimentalFeatures && !this.targets) {
             this.initializeAllocationTargets();
+          }
+
+          if (this.user.settings?.isExperimentalFeatures && !this.drift) {
+            this.loadAllocationDrift();
           }
 
           this.changeDetectorRef.markForCheck();
@@ -132,6 +140,32 @@ export class GfContributionPlanPageComponent {
       .subscribe((result: AllocationTargetsResponse | undefined) => {
         if (result) {
           this.initializeAllocationTargets();
+          this.loadAllocationDrift();
+        }
+      });
+  }
+
+  private loadAllocationDrift() {
+    this.isLoadingDrift = true;
+    this.driftErrorMessage = undefined;
+
+    this.dataService
+      .fetchAllocationDrift()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        error: (error: HttpErrorResponse) => {
+          this.isLoadingDrift = false;
+          this.driftErrorMessage =
+            error?.error?.message ??
+            $localize`Não foi possível carregar o desvio de alocação.`;
+
+          this.changeDetectorRef.markForCheck();
+        },
+        next: (drift) => {
+          this.drift = drift;
+          this.isLoadingDrift = false;
+
+          this.changeDetectorRef.markForCheck();
         }
       });
   }
